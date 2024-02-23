@@ -78,10 +78,6 @@ To open settings menu press '0'
 ## Support
 If you encounter any issues or have questions, please reach out to support@convai.com. Join our [Discord server](https://discord.gg/5mRtu2WhEm) to connect with the Convai community and receive updates and support from fellow developers.
 
-## License
-
-This project is licensed under the MIT License - see the `LICENSE.md` file for details.
-
 ---
 
 Thank you for choosing Convai for your development needs. We look forward to seeing the amazing experiences you create!
