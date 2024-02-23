@@ -12,6 +12,7 @@ Check out our [Documentation](https://docs.convai.com/api-docs/plugins-and-integ
 
 - [Documentation](https://docs.convai.com/api-docs/plugins-and-integrations/unity-plugin): Guide through the plugin's features and capabilities.
 - [Quick Start Video](https://youtu.be/Vhr7IvfITgU): Get started quickly and easily.
+- [WebGL Turorial Video](https://youtu.be/JXjcHEnEPCQ)
 - [Troubleshooting Guide](https://docs.convai.com/api-docs/plugins-and-integrations/unity-plugin/troubleshooting-guide): Solve commonly faced issues.
 - [Tutorial Series](https://www.youtube.com/playlist?list=PLn_7tCx0ChipYHtbe8yzdV5kMbozN2EeB): Master the plugin's full potential.
 - [Convai Website](https://convai.com/): Create custom characters and try them out.
