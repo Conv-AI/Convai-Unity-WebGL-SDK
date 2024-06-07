@@ -24,7 +24,7 @@ jobs:
         run: |
           TIMESTAMP=$(date +'%Y%m%d%H%M%S')
           VERSION="v${TIMESTAMP}"
-          RELEASE_NAME="Convai-Unity-WebGL-Nightly-${VERSION}"
+          RELEASE_NAME="Convai-Unity-WebGL-SDK-${VERSION}"
           echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
