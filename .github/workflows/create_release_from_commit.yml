@@ -1,0 +1,39 @@
+name: Create Release on New Commit
+
+on:
+  push:
+    branches:
+      - Public-Release # Triggers the workflow on push events to the release branch
+  workflow_dispatch: # Allows manual trigger via GitHub UI or CLI
+
+permissions:
+  contents: write  # Set write permissions for contents to create a release
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Ensures full history is fetched
+
+      - name: Create Release Version
+        id: create_version
+        run: |
+          TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+          VERSION="v${TIMESTAMP}"
+          RELEASE_NAME="Convai-Unity-WebGL-SDK-${VERSION}"
+          echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Publish Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.VERSION }}
+          release_name: ${{ env.RELEASE_NAME }}
+          draft: false
+          prerelease: false
