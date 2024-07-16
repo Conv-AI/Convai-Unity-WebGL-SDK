@@ -1,0 +1,48 @@
+name: Release from Main to Public repo
+on:
+  workflow_dispatch: # Allows manual trigger via GitHub UI or CLI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Main Repo
+        uses: actions/checkout@v3
+        with:
+          repository: Conv-AI/unitywebglplugin
+          path: unitywebglplugin
+
+      - name: Set up SSH for Main
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.MAIN_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - name: Set up SSH for Nightly
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.NIGHTLY_SSH_PRIVATE_KEY }}" > ~/.ssh/nightly_id_rsa
+          chmod 600 ~/.ssh/nightly_id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - name: Clone Nightly Repo
+        run: |
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/nightly_id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" git clone git@github.com:Conv-AI/Convai-Unity-WebGL-SDK.git
+      - name: Configure Git
+        run: |
+          git config --global user.email "convai-unity-dev@convai.com"
+          git config --global user.name "Unity dev"
+      - name: Sync Commits and Squash
+        run: |
+          cd Convai-Unity-WebGL-SDK
+          git remote add main git@github.com:Conv-AI/unitywebglplugin.git
+          git fetch main
+          git checkout -b temp-branch main/${{ github.event.repository.default_branch }}
+          git checkout Public-Release
+          git merge --squash -X theirs temp-branch --allow-unrelated-histories
+          git commit -m "Creating release from ${{ github.event.repository.default_branch }}"
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/nightly_id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" git push origin Public-Release
+
+          
+          
+          

@@ -55,9 +55,9 @@ Before you begin, ensure you have the following prerequisites installed on your 
 
 ## Installation
 
-1. **Download the Convai Unity SDK**: Download the latest SDK as a `.unitypackage` file from [releases](https://github.com/Conv-AI/Convai-Unity-WebGL-SDK/releases)  into your local machine.
-2. **Create a New Unity Project**: Open Unity Hub and create a new project, or use an existing Unity project where you want to integrate Convai.
-3. **Import the Convai Plugin**: In Unity, go to `Assets` > `Import Package` > `Custom Package`. Navigate to the folder where the SDK was downloaded and select the Convai-Unity-Nightly-SDK-mmddyy package to import it into your project.
+1. **Download the Convai Unity WebGL SDK**: Clone this repository or download the SDK as a `.zip` file and extract it to your local machine.
+2. **Create a New Unity Project**: Open Unity and create a new project, or use an existing Unity project where you want to integrate Convai.
+3. **Import the Convai Plugin**: In Unity, go to `Assets` > `Import Package` > `Custom Package`. Navigate to the extracted SDK folder and select the Convai plugin package to import it into your project.
 
 ## Configuration
 
@@ -76,6 +76,10 @@ To open settings menu press '0'
 
 ## Support
 If you encounter any issues or have questions, please reach out to support@convai.com. Join our [Discord server](https://discord.gg/5mRtu2WhEm) to connect with the Convai community and receive updates and support from fellow developers.
+
+## License
+
+This project is licensed under the MIT License - see the `LICENSE.md` file for details.
 
 ---
 

@@ -1,0 +1,1 @@
+./protoc --csharp_out=./grpc/client --grpc_out=./grpc/client --plugin=protoc-gen-grpc=./grpc/grpc_csharp_plugin.exe ./grpc/service.proto
