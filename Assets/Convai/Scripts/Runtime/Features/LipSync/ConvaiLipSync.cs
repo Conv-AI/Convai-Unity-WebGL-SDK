@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json;
 using UnityEngine;
 
 namespace Convai.Scripts.Utils
@@ -110,12 +109,7 @@ namespace Convai.Scripts.Utils
             int hashFirstEight = HashCode.Combine(Sil, Pp, Ff, Th, Dd, Kk, Ch, Ss);
             return HashCode.Combine(hashFirstEight, Nn, Rr, Aa, E, Ih, Oh, Ou);
         }
-
-        public override string ToString()
-        {
-            return JsonConvert.SerializeObject(this, Formatting.Indented);
-        }
-
+        
         public static bool operator ==(Viseme left, Viseme right)
         {
             return EqualityComparer<Viseme>.Default.Equals(left, right);
@@ -124,6 +118,11 @@ namespace Convai.Scripts.Utils
         public static bool operator !=(Viseme left, Viseme right)
         {
             return !(left == right);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return base.Equals(obj);
         }
     }
 

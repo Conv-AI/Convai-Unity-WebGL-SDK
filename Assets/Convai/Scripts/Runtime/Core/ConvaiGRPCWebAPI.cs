@@ -228,12 +228,7 @@ public class ConvaiGRPCWebAPI : MonoBehaviour
                 Debug.LogError("Deserialization returned null");
                 return;
             }
-
-            if (audioData.hasVisemesData == null)
-            {
-                Debug.LogError("audioData.hasVisemesData is null");
-            }
-
+            
             if (!audioData.hasVisemesData)
             {
                 activeConvaiNPC.AddAudioData(audioData);

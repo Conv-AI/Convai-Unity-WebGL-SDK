@@ -42,6 +42,7 @@ jobs:
           git merge --squash -X theirs temp-branch --allow-unrelated-histories
           git commit -m "Creating release from ${{ github.event.repository.default_branch }}"
           GIT_SSH_COMMAND="ssh -i ~/.ssh/nightly_id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" git push origin Public-Release
+          git push -f origin Public-Release
 
           
           

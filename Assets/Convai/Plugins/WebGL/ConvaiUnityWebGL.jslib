@@ -82,8 +82,7 @@ var ConvaiUnityWebGL = {
                 var responseText = audioResponse.getTextData();
 
                 if (responseText != "") {
-                    const now = new Date();
-                    const time = now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds() + "." + now.getMilliseconds();
+                    console.log("Response Text: " + responseText);
                 }
 
                 var visemeData;
@@ -140,7 +139,7 @@ var ConvaiUnityWebGL = {
      */
 
     sendTextRequest: function (request) {
-        console.log("request: " + UTF8ToString(request));
+        console.log("Request: " + UTF8ToString(request));
         this.convaiClient.sendTextChunk(UTF8ToString(request));
     },
 
@@ -161,7 +160,7 @@ var ConvaiUnityWebGL = {
      * @param {string} feedback_text - The text of the feedback.
      */
     sendFeedback: function (character_id, session_id, thumbs_up, feedback_text) {
-        console.log("interaction id: " + this.interactionId);
+        console.log("Interaction id: " + this.interactionId);
         if (this.interactionId === "" || this.interactionId === null || this.interactionId === undefined) {
             return;
         }

@@ -6,6 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Convai/Scenes/Convai Demo WebGL.unity
+    path: Assets/Convai/Demo/Scenes/Convai Demo WebGL.unity
     guid: 4d88fa024e94f554cb462d9d7f1227fb
   m_configObjects: {}
