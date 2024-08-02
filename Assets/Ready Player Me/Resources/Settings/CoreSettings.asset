@@ -13,4 +13,7 @@ MonoBehaviour:
   m_Name: CoreSettings
   m_EditorClassIdentifier: 
   Subdomain: demo
+  AppId: 
   EnableLogging: 0
+  EnableAnalytics: 1
+  BodyType: 1
