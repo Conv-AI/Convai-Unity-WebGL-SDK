@@ -1,112 +1,112 @@
-name: Create Release on New Commit
+# name: Create Release on New Commit
 
-on:
-  push:
-    branches:
-      - Public-Release # Triggers the workflow on push events to the release branch
-  workflow_dispatch: # Allows manual trigger via GitHub UI or CLI
+# on:
+#   push:
+#     branches:
+#       - Public-Release # Triggers the workflow on push events to the release branch
+#   workflow_dispatch: # Allows manual trigger via GitHub UI or CLI
 
-permissions:
-  contents: write  # Set write permissions for contents to create a release
+# permissions:
+#   contents: write  # Set write permissions for contents to create a release
 
-jobs:
-  create_release:
-    runs-on: ubuntu-latest
+# jobs:
+#   create_release:
+#     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4.1.6
-        with:
-          fetch-depth: 0 # Ensures full history is fetched
+#     steps:
+#       - name: Checkout Repository
+#         uses: actions/checkout@v4.1.6
+#         with:
+#           fetch-depth: 0 # Ensures full history is fetched
 
-      - name: Cache Library
-        uses: actions/cache@v4.0.2
-        with:
-          path: Library
-          key: Library-${{ github.repository }}-${{ runner.os }}-${{ hashFiles('**/Packages/manifest.json') }}
-          restore-keys: |
-            Library-${{ github.repository }}-${{ runner.os }}-
-            Library-${{ github.repository }}-
-            Library-
+#       - name: Cache Library
+#         uses: actions/cache@v4.0.2
+#         with:
+#           path: Library
+#           key: Library-${{ github.repository }}-${{ runner.os }}-${{ hashFiles('**/Packages/manifest.json') }}
+#           restore-keys: |
+#             Library-${{ github.repository }}-${{ runner.os }}-
+#             Library-${{ github.repository }}-
+#             Library-
 
-      - name: Create Release Version
-        id: create_version
-        run: |
-          DATE=$(date +'%m%d%y')
-          SHORT_COMMIT_HASH=$(git rev-parse --short HEAD)
-          VERSION="${DATE}-${SHORT_COMMIT_HASH}"
-          RELEASE_NAME="Convai-Unity-WebGL-SDK-${VERSION}"
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
+#       - name: Create Release Version
+#         id: create_version
+#         run: |
+#           DATE=$(date +'%m%d%y')
+#           SHORT_COMMIT_HASH=$(git rev-parse --short HEAD)
+#           VERSION="${DATE}-${SHORT_COMMIT_HASH}"
+#           RELEASE_NAME="Convai-Unity-WebGL-SDK-${VERSION}"
+#           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+#           echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
           
-      - name: Ensure Sufficient Disk Space
-        run: |
-          sudo apt-get clean
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android/sdk
-          sudo apt-get autoremove -y
+#       - name: Ensure Sufficient Disk Space
+#         run: |
+#           sudo apt-get clean
+#           sudo rm -rf /usr/share/dotnet
+#           sudo rm -rf /usr/local/lib/android/sdk
+#           sudo apt-get autoremove -y
 
-      - name: Setup Unity Builder
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 2022.3.30f1
-          targetPlatform: WebGL
-          versioning: Custom
-          version: ${{ env.VERSION }}
+#       - name: Setup Unity Builder
+#         uses: game-ci/unity-builder@v4
+#         env:
+#           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+#           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+#           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+#         with:
+#           unityVersion: 2022.3.30f1
+#           targetPlatform: WebGL
+#           versioning: Custom
+#           version: ${{ env.VERSION }}
 
-      - name: Ensure Permissions
-        run: |
-          sudo chmod -R 777 Assets
+#       - name: Ensure Permissions
+#         run: |
+#           sudo chmod -R 777 Assets
 
-      - name: Reset Uncommitted Changes
-        run: |
-          git reset --hard HEAD
+#       - name: Reset Uncommitted Changes
+#         run: |
+#           git reset --hard HEAD
           
-      - name: Create UnityPackage Script
-        run: |
-          mkdir -p Assets/Editor
-          echo 'using UnityEditor; public class ExportPackage { [MenuItem("Tools/Export Package")] public static void Export() { string[] assetPaths = new string[] { "Assets/Convai", "Packages/manifest.json" }; AssetDatabase.ExportPackage(assetPaths, "Convai-Unity-WebGL-SDK-${{ env.VERSION }}.unitypackage", ExportPackageOptions.Recurse); UnityEngine.Debug.Log("Package exported"); } }' > Assets/Editor/ExportPackage.cs
+#       - name: Create UnityPackage Script
+#         run: |
+#           mkdir -p Assets/Editor
+#           echo 'using UnityEditor; public class ExportPackage { [MenuItem("Tools/Export Package")] public static void Export() { string[] assetPaths = new string[] { "Assets/Convai", "Packages/manifest.json" }; AssetDatabase.ExportPackage(assetPaths, "Convai-Unity-WebGL-SDK-${{ env.VERSION }}.unitypackage", ExportPackageOptions.Recurse); UnityEngine.Debug.Log("Package exported"); } }' > Assets/Editor/ExportPackage.cs
 
           
-      - name: Run Export Package Method
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          unityVersion: 2022.3.30f1
-          targetPlatform: WebGL
-          versioning: Custom
-          version: ${{ env.VERSION }}
-          buildMethod: ExportPackage.Export
+#       - name: Run Export Package Method
+#         uses: game-ci/unity-builder@v4
+#         env:
+#           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+#           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+#           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+#         with:
+#           unityVersion: 2022.3.30f1
+#           targetPlatform: WebGL
+#           versioning: Custom
+#           version: ${{ env.VERSION }}
+#           buildMethod: ExportPackage.Export
 
 
-      - name: Upload UnityPackage as Artifact
-        uses: actions/upload-artifact@v4.3.3
-        with:
-          name: Convai-Unity-WebGL-SDK
-          path: Convai-Unity-WebGL-SDK-${{ env.VERSION }}.unitypackage
+#       - name: Upload UnityPackage as Artifact
+#         uses: actions/upload-artifact@v4.3.3
+#         with:
+#           name: Convai-Unity-WebGL-SDK
+#           path: Convai-Unity-WebGL-SDK-${{ env.VERSION }}.unitypackage
 
-      - name: Create Git Tag
-        run: |
-          git tag ${{ env.VERSION }}
-          git push origin ${{ env.VERSION }}
+#       - name: Create Git Tag
+#         run: |
+#           git tag ${{ env.VERSION }}
+#           git push origin ${{ env.VERSION }}
 
-      - name: Create and Upload Release
-        uses: softprops/action-gh-release@v2.0.5
-        with:
-          tag_name: ${{ env.VERSION }}
-          name: ${{ env.RELEASE_NAME }}
-          files: Convai-Unity-WebGL-SDK-${{ env.VERSION }}.unitypackage
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#       - name: Create and Upload Release
+#         uses: softprops/action-gh-release@v2.0.5
+#         with:
+#           tag_name: ${{ env.VERSION }}
+#           name: ${{ env.RELEASE_NAME }}
+#           files: Convai-Unity-WebGL-SDK-${{ env.VERSION }}.unitypackage
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Return License
-      - name: Return license
-        uses: game-ci/unity-return-license@v2
-        if: always()
+#       # Return License
+#       - name: Return license
+#         uses: game-ci/unity-return-license@v2
+#         if: always()
