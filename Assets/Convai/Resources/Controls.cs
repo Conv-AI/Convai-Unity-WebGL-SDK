@@ -107,6 +107,15 @@ public partial class @Controls: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""ToggleChat"",
+                    ""type"": ""Button"",
+                    ""id"": ""b9697f09-5fee-41f7-a5d7-63ed0fae7d50"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -307,6 +316,28 @@ public partial class @Controls: IInputActionCollection2, IDisposable
                     ""action"": ""Move"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""8cec5865-2d9d-41af-bb65-ee24cf627473"",
+                    ""path"": ""<Keyboard>/enter"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""ToggleChat"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b5da9813-3a92-4615-b59b-b1856b870d68"",
+                    ""path"": ""<Keyboard>/numpadEnter"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""ToggleChat"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -363,6 +394,7 @@ public partial class @Controls: IInputActionCollection2, IDisposable
         m_Player_SendText = m_Player.FindAction("SendText", throwIfNotFound: true);
         m_Player_ToggleSettings = m_Player.FindAction("ToggleSettings", throwIfNotFound: true);
         m_Player_CursorUnlock = m_Player.FindAction("CursorUnlock", throwIfNotFound: true);
+        m_Player_ToggleChat = m_Player.FindAction("ToggleChat", throwIfNotFound: true);
     }
 
     public void Dispose()
@@ -433,6 +465,7 @@ public partial class @Controls: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_SendText;
     private readonly InputAction m_Player_ToggleSettings;
     private readonly InputAction m_Player_CursorUnlock;
+    private readonly InputAction m_Player_ToggleChat;
     public struct PlayerActions
     {
         private @Controls m_Wrapper;
@@ -446,6 +479,7 @@ public partial class @Controls: IInputActionCollection2, IDisposable
         public InputAction @SendText => m_Wrapper.m_Player_SendText;
         public InputAction @ToggleSettings => m_Wrapper.m_Player_ToggleSettings;
         public InputAction @CursorUnlock => m_Wrapper.m_Player_CursorUnlock;
+        public InputAction @ToggleChat => m_Wrapper.m_Player_ToggleChat;
         public InputActionMap Get() { return m_Wrapper.m_Player; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -482,6 +516,9 @@ public partial class @Controls: IInputActionCollection2, IDisposable
             @CursorUnlock.started += instance.OnCursorUnlock;
             @CursorUnlock.performed += instance.OnCursorUnlock;
             @CursorUnlock.canceled += instance.OnCursorUnlock;
+            @ToggleChat.started += instance.OnToggleChat;
+            @ToggleChat.performed += instance.OnToggleChat;
+            @ToggleChat.canceled += instance.OnToggleChat;
         }
 
         private void UnregisterCallbacks(IPlayerActions instance)
@@ -513,6 +550,9 @@ public partial class @Controls: IInputActionCollection2, IDisposable
             @CursorUnlock.started -= instance.OnCursorUnlock;
             @CursorUnlock.performed -= instance.OnCursorUnlock;
             @CursorUnlock.canceled -= instance.OnCursorUnlock;
+            @ToggleChat.started -= instance.OnToggleChat;
+            @ToggleChat.performed -= instance.OnToggleChat;
+            @ToggleChat.canceled -= instance.OnToggleChat;
         }
 
         public void RemoveCallbacks(IPlayerActions instance)
@@ -568,5 +608,6 @@ public partial class @Controls: IInputActionCollection2, IDisposable
         void OnSendText(InputAction.CallbackContext context);
         void OnToggleSettings(InputAction.CallbackContext context);
         void OnCursorUnlock(InputAction.CallbackContext context);
+        void OnToggleChat(InputAction.CallbackContext context);
     }
 }

@@ -7,6 +7,7 @@ using Convai.Scripts.Runtime.LoggerSystem;
 using Convai.Scripts.Runtime.UI;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 #if UNITY_ANDROID
 using UnityEngine.Android;
 #endif
@@ -34,6 +35,8 @@ namespace Convai.Scripts.Runtime.Core
         [Tooltip("Is this character active?")] [ReadOnly]
         public bool isCharacterActive;
 
+        [HideInInspector] public bool isInitialized;
+        
         private readonly List<ResponseAudio> _responseAudios = new();
         private readonly List<AudioData> _audioDataList = new();
         private bool _animationPlaying;
@@ -41,15 +44,23 @@ namespace Convai.Scripts.Runtime.Core
         private bool _canPlayAudio;
         private Animator _characterAnimator;
         private ConvaiChatUIHandler _convaiChatUIHandler;
+        private ConvaiCrosshairHandler _convaiCrosshairHandler;
         private TMP_InputField _currentInputField;
         private ConvaiGRPCWebAPI _grpcWebAPI;
-        private bool _isActionActive;
         private bool _isLipSyncActive;
         private string _lastReceivedText;
         private bool _playingStopLoop;
+        
         public ConvaiLipSync ConvaiLipSync { get; private set; }
+        public NarrativeDesignManager ConvaiNarrativeDesignManager { get; private set; }
+        public ConvaiActionsHandler ConvaiActionsHandler { get; private set; }
+
+        public NarrativeDesignKeyController ConvaiNarrativeDesignKeyController { get; private set; }
+        [HideInInspector] public TriggerUnityEvent onTriggerSent;
+
         [HideInInspector] public ConvaiPlayerInteractionManager playerInteractionManager;
         private bool IsCharacterActive => isCharacterActive;
+
         private bool IsCharacterTalking
         {
             get => isCharacterTalking;
@@ -57,7 +68,10 @@ namespace Convai.Scripts.Runtime.Core
         }
 
         // Properties with getters and setters
+        [field: NonSerialized] public bool IncludeActionsHandler { get; set; }
         [field: NonSerialized] public bool LipSync { get; set; }
+        [field: NonSerialized] public bool NarrativeDesignManager { get; set; }
+        [field: NonSerialized] public bool NarrativeDesignKeyController { get; set; }
         [field: NonSerialized] public bool HeadEyeTracking { get; set; }
         [field: NonSerialized] public bool EyeBlinking { get; set; }
 
@@ -68,6 +82,7 @@ namespace Convai.Scripts.Runtime.Core
         {
             // Find and assign necessary components
             _convaiChatUIHandler = FindObjectOfType<ConvaiChatUIHandler>();
+            _convaiCrosshairHandler = FindObjectOfType<ConvaiCrosshairHandler>();
             _audioSource = GetComponent<AudioSource>();
             _characterAnimator = GetComponent<Animator>();
             InitializePlayerInteractionManager();
@@ -76,6 +91,21 @@ namespace Convai.Scripts.Runtime.Core
             {
                 _isLipSyncActive = true;
                 ConvaiLipSync = convaiLipSync;
+            }
+
+            if (TryGetComponent(out NarrativeDesignManager narrativeDesignManager))
+            {
+                ConvaiNarrativeDesignManager = narrativeDesignManager;
+            }
+
+            if (TryGetComponent(out ConvaiActionsHandler convaiActionsHandler))
+            {
+                ConvaiActionsHandler = convaiActionsHandler;
+            }
+
+            if (TryGetComponent(out NarrativeDesignKeyController narrativeDesignKeyController))
+            {
+                ConvaiNarrativeDesignKeyController = narrativeDesignKeyController;
             }
 
             OnCharacterTalking += HandleCharacterTalkingAnimation;
@@ -107,7 +137,7 @@ namespace Convai.Scripts.Runtime.Core
             OnCharacterTalking -= HandleCharacterTalkingAnimation;
             if (_convaiChatUIHandler != null) _convaiChatUIHandler.UpdateCharacterList();
         }
-        
+
         // Events
         public event Action<bool> OnCharacterTalking;
 
@@ -254,7 +284,7 @@ namespace Convai.Scripts.Runtime.Core
         private void InitializePlayerInteractionManager()
         {
             playerInteractionManager = gameObject.AddComponent<ConvaiPlayerInteractionManager>();
-            playerInteractionManager.Initialize(this, _convaiChatUIHandler);
+            playerInteractionManager.Initialize(this, _convaiCrosshairHandler, _convaiChatUIHandler);
         }
 
         /// <summary>
@@ -309,6 +339,38 @@ namespace Convai.Scripts.Runtime.Core
             SetCharacterTalking(true);
         }
 
+        public void TriggerEvent(string triggerName)
+        {
+            string triggerMessage = "";
+            TriggerConfig triggerConfig = new()
+            {
+                TriggerName = triggerName,
+                TriggerMessage = triggerMessage
+            };
+
+            // Send the trigger to the server using GRPC
+            ConvaiGRPCWebAPI.Instance.SendTriggerConfig(triggerConfig);
+
+            // Invoke the UnityEvent
+            onTriggerSent.Invoke(triggerMessage, triggerName);
+        }
+
+        public void TriggerSpeech(string triggerMessage)
+        {
+            string triggerName = "";
+            TriggerConfig triggerConfig = new()
+            {
+                TriggerName = triggerName,
+                TriggerMessage = triggerMessage
+            };
+
+            // Send the trigger to the server using GRPC
+            ConvaiGRPCWebAPI.Instance.SendTriggerConfig(triggerConfig);
+
+            // Invoke the UnityEvent
+            onTriggerSent.Invoke(triggerMessage, triggerName);
+        }
+
         /// <summary>
         ///     Represents audio data,text and its finality status in a response.
         /// </summary>
@@ -328,6 +390,11 @@ namespace Convai.Scripts.Runtime.Core
             ///     The text associated with the audio.
             /// </summary>
             public string ResponseText;
+        }
+
+        [Serializable]
+        public class TriggerUnityEvent : UnityEvent<string, string>
+        {
         }
     }
 }

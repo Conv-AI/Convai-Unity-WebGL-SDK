@@ -87,6 +87,7 @@ GameObject:
   - component: {fileID: 4382189480176362238}
   - component: {fileID: 5141426608584112826}
   - component: {fileID: 1488905990286529152}
+  - component: {fileID: 408332930935707950}
   m_Layer: 5
   m_Name: Convai Crosshair Canvas
   m_TagString: Untagged
@@ -177,3 +178,15 @@ MonoBehaviour:
   m_BlockingMask:
     serializedVersion: 2
     m_Bits: 4294967295
+--- !u!114 &408332930935707950
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7399865485203339537}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9075946a1a51c9f4abe905231892b484, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

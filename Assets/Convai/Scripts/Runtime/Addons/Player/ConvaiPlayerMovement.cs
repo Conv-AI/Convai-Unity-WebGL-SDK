@@ -74,7 +74,7 @@ namespace Convai.Scripts.Runtime.Addons
         {
             Vector3 horizontalMovement = Vector3.zero;
 
-            if (!EventSystem.current.IsPointerOverGameObject())
+            if (!EventSystem.current.IsPointerOverGameObject() && !UIUtilities.IsAnyInputFieldFocused())
             {
                 Vector3 forward = transform.TransformDirection(Vector3.forward);
                 Vector3 right = transform.TransformDirection(Vector3.right);

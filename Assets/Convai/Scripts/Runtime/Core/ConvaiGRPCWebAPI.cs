@@ -74,9 +74,32 @@ namespace Convai.Scripts.Runtime.Core
             if (newActiveNPC == null) return;
             activeConvaiNPC = newActiveNPC;
 
+
 #if UNITY_WEBGL && !UNITY_EDITOR
-        InitializeConvaiClient(activeConvaiNPC.characterID, true, false);
-        Debug.Log("ConvaiNPC component initialized");
+            if (activeConvaiNPC.isInitialized) return;
+
+            string templateKeyJSON = String.Empty;
+            string actionConfig = String.Empty;
+
+            if (activeConvaiNPC.ConvaiNarrativeDesignKeyController != null)
+            {
+                templateKeyJSON = JsonUtility.ToJson(activeConvaiNPC.ConvaiNarrativeDesignKeyController.narrativeDesignKeyController);
+            }
+
+            if (activeConvaiNPC.ConvaiActionsHandler != null)
+            {
+                actionConfig = JsonUtility.ToJson(activeConvaiNPC.ConvaiActionsHandler.ActionConfig);
+            }
+
+            if (string.IsNullOrEmpty(templateKeyJSON))
+            {
+                InitializeConvaiClient(activeConvaiNPC.characterID, true, false, actionConfig);
+            }
+            else
+            {
+                InitializeConvaiClient(activeConvaiNPC.characterID, true, false, actionConfig, templateKeyJSON);
+            }
+            activeConvaiNPC.isInitialized = true;
 #else
             Debug.LogWarning("WebGL SDK does not run in Unity Editor. Please build and run in WebGL.");
 #endif
@@ -156,10 +179,18 @@ namespace Convai.Scripts.Runtime.Core
         /// <summary>
         ///     Initializes Convai with given parameters.
         /// </summary>
-        public void InitializeConvaiClient(string characterID, bool enableAudioRecorder, bool enableAudioPlayer)
+        public void InitializeConvaiClient(string characterID, bool enableAudioRecorder, bool enableAudioPlayer, string actionConfig = "", string templateKeys = "")
         {
             Debug.Log("Character ID: " + activeConvaiNPC.characterID);
-            initializeConvaiClient(APIKey, characterID, enableAudioRecorder, enableAudioPlayer);
+
+            if (string.IsNullOrEmpty(templateKeys))
+            {
+                initializeConvaiClient(APIKey, characterID, enableAudioRecorder, enableAudioPlayer, actionConfig);
+            }
+            else
+            {
+                initializeConvaiClient(APIKey, characterID, enableAudioRecorder, enableAudioPlayer, actionConfig, templateKeys);
+            }
         }
 
         /// <summary>
@@ -195,7 +226,7 @@ namespace Convai.Scripts.Runtime.Core
         public void OnUserResponseReceived(string text)
         {
             if (_convaiChatUIHandler == null) return;
-            
+
             if (!string.IsNullOrWhiteSpace(text))
             {
                 _convaiChatUIHandler.SendPlayerText(text);
@@ -264,6 +295,23 @@ namespace Convai.Scripts.Runtime.Core
             }
         }
 
+        public void OnBTResponseReceived(string narrativeSectionID)
+        {
+            if (activeConvaiNPC.ConvaiNarrativeDesignManager != null)
+            {
+                Debug.Log("narrativeSectionID: " + narrativeSectionID);
+                activeConvaiNPC.ConvaiNarrativeDesignManager.UpdateCurrentSection(narrativeSectionID);
+            }
+        }
+
+        public void OnActionResponseReceived(string actionResponse)
+        {
+            if (activeConvaiNPC.ConvaiActionsHandler != null)
+            {
+                activeConvaiNPC.ConvaiActionsHandler.actionResponseList.Add(actionResponse);
+            }
+        }
+
         private void ProcessVisemeData(VisemesData visemesData)
         {
             if (visemesData.Visemes.Sil == -2)
@@ -292,6 +340,20 @@ namespace Convai.Scripts.Runtime.Core
             sendFeedback(characterID, sessionID, thumbsUp, feedbackText);
         }
 
+        public void SendTriggerConfig(TriggerConfig triggerConfig)
+        {
+            string triggerName = triggerConfig.TriggerName;
+            string triggerMessage = triggerConfig.TriggerMessage;
+
+            Debug.Log("Sending Trigger Data: " + triggerName + " : " + triggerMessage);
+            sendTriggerData(triggerName, triggerMessage);
+        }
+
+        public void UpdateActionConfig(ActionConfig actionConfig)
+        {
+            setActionConfig(JsonUtility.ToJson(actionConfig));
+        }
+
         /// <summary>
         ///     Interrupts the character speech.
         /// </summary>
@@ -316,7 +378,7 @@ namespace Convai.Scripts.Runtime.Core
         private static extern void endAudioChunk(); // Ends audio chunk
 
         [DllImport("__Internal")]
-        private static extern void initializeConvaiClient(string apiKey, string characterId, bool enableAudioRecorder, bool enableAudioPlayer); // Initializes Convai client
+        private static extern void initializeConvaiClient(string apiKey, string characterId, bool enableAudioRecorder, bool enableAudioPlayer, string actionConfig = "", string templateKeys = ""); // Initializes Convai client
 
         [DllImport("__Internal")]
         private static extern void initMicrophone(); // Initializes microphone
@@ -326,6 +388,12 @@ namespace Convai.Scripts.Runtime.Core
 
         [DllImport("__Internal")]
         private static extern void sendFeedback(string character_id, string session_id, bool thumbs_up, string feedback_text);
+
+        [DllImport("__Internal")]
+        private static extern void sendTriggerData(string triggerName, string triggerMessage);
+
+        [DllImport("__Internal")]
+        private static extern void setActionConfig(string actionConfig);
 
         [DllImport("__Internal")]
         private static extern void interruptCharacter();
