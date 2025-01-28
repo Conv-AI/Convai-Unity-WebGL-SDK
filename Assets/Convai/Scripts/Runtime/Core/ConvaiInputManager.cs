@@ -19,6 +19,7 @@ namespace Convai.Scripts.Runtime.Core
         public bool isRunning { get; private set; }
 
         public Action jumping;
+        public Action toggleChat;
         public Action sendText;
         public Action toggleSettings;
 
@@ -139,7 +140,10 @@ namespace Convai.Scripts.Runtime.Core
         {
             if (context.performed) sendText?.Invoke();
         }
-
+        public void OnToggleChat(InputAction.CallbackContext context)
+        {
+            if (context.performed) toggleChat?.Invoke();
+        }
         public void OnToggleSettings(InputAction.CallbackContext context)
         {
             if (context.performed) toggleSettings?.Invoke();

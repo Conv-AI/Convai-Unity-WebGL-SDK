@@ -38,18 +38,43 @@ var ConvaiUnityWebGL = {
      * @param {number} faceModal - The face modal to use for the character.
      * @param {boolean} enableFacialData - Flag to enable facial data.
      */
-    initializeConvaiClient: function (apiKey, characterId, enableAudioRecorder, enableAudioPlayer) {
+    initializeConvaiClient: function (apiKey, characterId, enableAudioRecorder, enableAudioPlayer, actionConfig, templateKeys) {
 
-        console.log("enable audio recorder: ", enableAudioRecorder);
+        let NDTemplateKeys;
+        templateKeys = UTF8ToString(templateKeys);
+
+        if (templateKeys) {
+            const parsedData = JSON.parse(templateKeys);
+            NDTemplateKeys = new Map();
+
+            if (Array.isArray(parsedData.narrativeDesignKeys)) {
+                parsedData.narrativeDesignKeys.forEach(item => {
+                    if (item.name && item.value) {
+                        NDTemplateKeys.set(item.name, item.value);
+                    }
+                });
+            }
+
+            NDTemplateKeys.forEach((value, key) => console.log("Key:", key, "Value:", value));
+        }
+
+        let ActionConfig;
+
+        actionConfig = UTF8ToString(actionConfig);
+
+        if (actionConfig) {
+            ActionConfig = JSON.parse(actionConfig);
+        }
+
 
         this.convaiClient = new ConvaiClient({
             apiKey: UTF8ToString(apiKey),
             characterId: UTF8ToString(characterId),
-            //enableAudioRecorder: enableAudioRecorder,
             enableAudio: enableAudioRecorder,
             faceModal: 3,
             enableFacialData: true,
-            // action config - not needed
+            narrativeTemplateKeysMap: NDTemplateKeys && NDTemplateKeys.size > 0 ? NDTemplateKeys : undefined,
+            actionConfig: ActionConfig ? ActionConfig : undefined
         });
 
         if (this.convaiClient.getAudioVolume() > 0) {
@@ -62,6 +87,18 @@ var ConvaiUnityWebGL = {
         })
 
         this.convaiClient.setResponseCallback(function (response) {
+
+            if (response.hasBtResponse()) {
+                let btResponse = response.getBtResponse().getNarrativeSectionId();
+                console.log("BT Response: ", btResponse)
+                SendMessage("ConvaiGRPCWebAPI", "OnBTResponseReceived", btResponse);
+            }
+
+            if (response.hasActionResponse()) {
+                let actionResponse = response.getActionResponse();
+                console.log("Action Response: ", actionResponse.getAction());
+                SendMessage("ConvaiGRPCWebAPI", "OnActionResponseReceived", actionResponse.getAction());
+            }
 
             if (response.hasUserQuery()) {
                 var transcript = response.getUserQuery();
@@ -166,6 +203,17 @@ var ConvaiUnityWebGL = {
             return;
         }
         this.convaiClient.sendFeedback(this.interactionId, UTF8ToString(character_id), UTF8ToString(session_id), thumbs_up, UTF8ToString(feedback_text));
+    },
+
+    sendTriggerData: function (name, message, preload = false) {
+        console.log("%cInvoke Trigger Name : " + UTF8ToString(name) + " | Message: " + UTF8ToString(message) + " | PreLoad: " + preload, "color: pink;");
+        this.convaiClient.invokeTrigger(UTF8ToString(name), UTF8ToString(message), preload)
+    },
+
+    setActionConfig: function (config) {
+        var parsedConfig = JSON.parse(UTF8ToString(config));
+
+        this.convaiClient.setActionConfig(parsedConfig);
     },
 
     /**

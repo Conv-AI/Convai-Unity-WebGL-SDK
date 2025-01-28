@@ -1,3 +1,4 @@
+using Convai.Scripts.Runtime.Features;
 using Convai.Scripts.Runtime.LoggerSystem;
 using UnityEngine;
 
@@ -14,8 +15,10 @@ namespace Convai.Scripts.Runtime.Core
     {
         private const float POSITION_UPDATE_DELAY = 2f;
 
-        [Header("Tracking Properties")] [Tooltip("The object that the head should track.")] [SerializeField]
-        private Transform targetObject;
+        [field: Header("Tracking Properties")]
+        [Tooltip("The object that the head should track.")]
+        [field: SerializeField]
+        public Transform TargetObject { get; set; }
 
         [Range(0.0f, 100.0f)] [Tooltip("The maximum distance at which the head must still track target.")] [SerializeField]
         private float trackingDistance = 10f;
@@ -49,10 +52,8 @@ namespace Convai.Scripts.Runtime.Core
         private bool lookAway;
 
         private Animator _animator;
-
         private float _appliedBodyLookAtWeight;
-
-        // private ConvaiActionsHandler _convaiActionsHandler;
+        private ConvaiActionsHandler _convaiActionsHandler;
         private float _currentLookAtWeight;
         private float _desiredLookAtWeight = 1f;
         private Transform _headPivot;
@@ -63,6 +64,12 @@ namespace Convai.Scripts.Runtime.Core
             InitializeComponents();
             InitializeHeadPivot();
             InvokeRepeating(nameof(UpdateTarget), 0, POSITION_UPDATE_DELAY);
+        }
+
+        private void OnDisable()
+        {
+            if (_convaiActionsHandler != null)
+                _convaiActionsHandler.UnregisterForActionEvents(ConvaiActionsHandler_OnActionStarted, ConvaiActionsHandler_OnActionEnded);
         }
 
         /// <summary>
@@ -77,6 +84,19 @@ namespace Convai.Scripts.Runtime.Core
         {
             if (!_animator) _animator = GetComponent<Animator>();
             InitializeTargetObject();
+
+            if (TryGetComponent(out _convaiActionsHandler))
+                _convaiActionsHandler.RegisterForActionEvents(ConvaiActionsHandler_OnActionStarted, ConvaiActionsHandler_OnActionEnded);
+        }
+
+        private void ConvaiActionsHandler_OnActionStarted(string action, GameObject target)
+        {
+            SetActionRunning(true);
+        }
+
+        private void ConvaiActionsHandler_OnActionEnded(string action, GameObject target)
+        {
+            SetActionRunning(false);
         }
 
         private void InitializeHeadPivot()
@@ -97,7 +117,7 @@ namespace Convai.Scripts.Runtime.Core
 
         private void RotateCharacterTowardsTarget()
         {
-            Vector3 toTarget = targetObject.position - transform.position;
+            Vector3 toTarget = TargetObject.position - transform.position;
             float distance = toTarget.magnitude;
 
             // Calculate the angle difference between the character's forward direction and the direction towards the target.
@@ -126,11 +146,11 @@ namespace Convai.Scripts.Runtime.Core
 
         private void InitializeTargetObject()
         {
-            if (targetObject != null) return;
+            if (TargetObject != null) return;
 
             ConvaiLogger.Warn("No target object set for head tracking. Setting default target as main camera",
                 ConvaiLogger.LogCategory.Character);
-            if (Camera.main != null) targetObject = Camera.main.transform;
+            if (Camera.main != null) TargetObject = Camera.main.transform;
         }
 
         /// <summary>
@@ -148,7 +168,7 @@ namespace Convai.Scripts.Runtime.Core
         {
             if (_isActionRunning) return;
 
-            float distance = Vector3.Distance(transform.position, targetObject.position);
+            float distance = Vector3.Distance(transform.position, TargetObject.position);
             DrawRayToTarget();
 
             // only perform head tracking if within threshold distance
@@ -160,7 +180,7 @@ namespace Convai.Scripts.Runtime.Core
             }
 
             SetCurrentLookAtWeight();
-            _headPivot.transform.LookAt(targetObject); // orient the pivot towards the target object
+            _headPivot.transform.LookAt(TargetObject); // orient the pivot towards the target object
             // set the current look at weight based on how much rotation is needed
 
             // limit the head rotation
@@ -207,7 +227,7 @@ namespace Convai.Scripts.Runtime.Core
         private void AdjustAnimatorLookAt()
         {
             // Check if Animator or TargetObject are null
-            if (!_animator || targetObject == null)
+            if (!_animator || TargetObject == null)
             {
                 // If either is null, set the look-at weight to 0 and return, effectively ending the method early
                 _animator.SetLookAtWeight(0);
@@ -217,7 +237,7 @@ namespace Convai.Scripts.Runtime.Core
             // Set the look-at weights in the Animator.
             // This is used to dictate how much the body, head or eyes should turn to "look at" the target.
             // `Mathf.Clamp` is used to ensure the weight values lie between 0 and 1 (inclusive).
-            // The body weight is clamped between 0 and 0.5 since it's less advisable to rotate the body too much versus the head or eyes.
+            // The body weight is clamped between 0 to 0.5 since it's less advisable to rotate the body too much versus the head or eyes.
             _animator.SetLookAtWeight(Mathf.Clamp(
                     _currentLookAtWeight, 0, 1),
                 Mathf.Clamp(_appliedBodyLookAtWeight, 0, .5f),
@@ -225,7 +245,7 @@ namespace Convai.Scripts.Runtime.Core
                 Mathf.Clamp(eyesLookAtWeight, 0, 1));
 
             // Set the look-at position for the Animator (where the body/head/eyes will turn toward)
-            _animator.SetLookAtPosition(targetObject.position);
+            _animator.SetLookAtPosition(TargetObject.position);
         }
 
         /// <summary>
@@ -239,7 +259,12 @@ namespace Convai.Scripts.Runtime.Core
             // "Normalized" ensures that the vector has a magnitude (length) of 1, keeping the scaling of the vector consistent.
             // This ray appears red in the Scene view.
             Debug.DrawRay(pos,
-                (targetObject.position - pos).normalized * trackingDistance / 2, Color.red);
+                (TargetObject.position - pos).normalized * trackingDistance / 2, Color.red);
+        }
+
+        public void SetActionRunning(bool newValue)
+        {
+            _isActionRunning = newValue;
         }
     }
 }

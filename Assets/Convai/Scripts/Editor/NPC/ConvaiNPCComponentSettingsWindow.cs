@@ -55,9 +55,15 @@ namespace Convai.Scripts.Editor.NPC
             EditorGUILayout.BeginVertical(GUI.skin.box);
             EditorGUIUtility.labelWidth = LABEL_WIDTH;
 
+            _convaiNPC.IncludeActionsHandler = EditorGUILayout.Toggle(new GUIContent("NPC Actions", "Decides if Actions Handler is included"), _convaiNPC.IncludeActionsHandler);
             _convaiNPC.LipSync = EditorGUILayout.Toggle(new GUIContent("Lip Sync", "Decides if Lip Sync is enabled"), _convaiNPC.LipSync);
             _convaiNPC.HeadEyeTracking = EditorGUILayout.Toggle(new GUIContent("Head & Eye Tracking", "Decides if Head & Eye tracking is enabled"), _convaiNPC.HeadEyeTracking);
             _convaiNPC.EyeBlinking = EditorGUILayout.Toggle(new GUIContent("Eye Blinking", "Decides if Eye Blinking is enabled"), _convaiNPC.EyeBlinking);
+            _convaiNPC.NarrativeDesignManager = EditorGUILayout.Toggle(new GUIContent("Narrative Design Manager", "Decides if Narrative Design Manager is enabled"),
+                _convaiNPC.NarrativeDesignManager);
+            _convaiNPC.NarrativeDesignKeyController =
+                EditorGUILayout.Toggle(new GUIContent("Narrative Design Keys", "Adds handler for Narrative Design Keys for this character"),
+                    _convaiNPC.NarrativeDesignKeyController);
 
             EditorGUILayout.EndVertical();
         }
@@ -78,9 +84,12 @@ namespace Convai.Scripts.Editor.NPC
         {
             if (_convaiNPC == null) return;
 
+            _convaiNPC.IncludeActionsHandler = _convaiNPC.GetComponent<ConvaiActionsHandler>() is not null;
             _convaiNPC.LipSync = _convaiNPC.GetComponent<ConvaiLipSync>() != null;
             _convaiNPC.HeadEyeTracking = _convaiNPC.GetComponent<ConvaiHeadTracking>() != null;
             _convaiNPC.EyeBlinking = _convaiNPC.GetComponent<ConvaiBlinkingHandler>() != null;
+            _convaiNPC.NarrativeDesignManager = _convaiNPC.GetComponent<NarrativeDesignManager>() != null;
+            _convaiNPC.NarrativeDesignKeyController = _convaiNPC.GetComponent<NarrativeDesignKeyController>() is not null;
             Repaint();
         }
 
@@ -89,9 +98,13 @@ namespace Convai.Scripts.Editor.NPC
             if (!EditorUtility.DisplayDialog("Confirm Apply Changes", "Do you want to apply the following changes?", "Yes", "No"))
                 return;
 
+            ApplyComponent<ConvaiActionsHandler>(_convaiNPC.IncludeActionsHandler);
             ApplyComponent<ConvaiLipSync>(_convaiNPC.LipSync);
             ApplyComponent<ConvaiHeadTracking>(_convaiNPC.HeadEyeTracking);
             ApplyComponent<ConvaiBlinkingHandler>(_convaiNPC.EyeBlinking);
+            ApplyComponent<NarrativeDesignManager>(_convaiNPC.NarrativeDesignManager);
+            ApplyComponent<NarrativeDesignKeyController>(_convaiNPC.NarrativeDesignKeyController);
+
         }
 
         private void ApplyComponent<T>(bool includeComponent) where T : Component

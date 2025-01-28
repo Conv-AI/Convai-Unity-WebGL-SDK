@@ -16,4 +16,3 @@ MonoBehaviour:
   AppId: 
   EnableLogging: 0
   EnableAnalytics: 1
-  BodyType: 1

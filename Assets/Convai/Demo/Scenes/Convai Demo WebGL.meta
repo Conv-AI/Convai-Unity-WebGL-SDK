@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Convai/Demo/Scenes/Convai Demo WebGL.meta
 guid: 5f422c0297e2dc649bd1053ce0dfaeff
+========
+guid: f6d89e94776f13a45a908da43e3b4c7c
+>>>>>>>> upstream/main:Assets/Convai/Resources/Settings.meta
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}

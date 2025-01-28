@@ -9,14 +9,13 @@ namespace Convai.Scripts.Runtime.Features
     [AddComponentMenu("Convai/Convai Interactables Data")]
     public class ConvaiInteractablesData : MonoBehaviour
     {
-        // [Tooltip("Flag to toggle display of actions")] [SerializeField]
-        // public bool displayActions;
-
         [Tooltip("Array of Characters in the environment")] [SerializeField]
         public Character[] Characters;
 
         [Tooltip("Array of Objects in the environment")] [SerializeField]
         public Object[] Objects;
+
+        public Transform DynamicMoveTargetIndicator;
 
         /// <summary>
         ///     Represents a character in the environment.
