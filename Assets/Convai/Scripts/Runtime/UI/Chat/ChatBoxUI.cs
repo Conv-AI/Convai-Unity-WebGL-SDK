@@ -13,7 +13,7 @@ namespace Convai.Scripts.Runtime.UI
     {
         private const int MAX_MESSAGES = 25;
 
-        private readonly List<Message> _messageList = new();
+        private List<Message> _messageList = new();
         private GameObject _chatPanel, _textObject;
         private ScrollRect _chatScrollRect;
         private Speaker _currentSpeaker;
@@ -30,6 +30,9 @@ namespace Convai.Scripts.Runtime.UI
             _textObject = _chatPanel.transform.GetChild(0).gameObject;
             _chatScrollRect = UIInstance.transform.GetChild(0).GetChild(0).GetComponent<ScrollRect>();
             UIInstance.SetActive(false);
+            _currentSpeaker = Speaker.Player;
+            _isFirstMessage = true;
+            _messageList = new List<Message>();
         }
 
         /// <summary>

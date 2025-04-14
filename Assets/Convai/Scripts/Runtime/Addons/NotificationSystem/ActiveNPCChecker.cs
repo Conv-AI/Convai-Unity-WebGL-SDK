@@ -39,7 +39,7 @@ namespace Convai.Scripts.Runtime.Addons
             try
             {
                 if (!input.action.WasPressedThisFrame() || UIUtilities.IsAnyInputFieldFocused() || ConvaiNPCManager.Instance.activeConvaiNPC == null)
-                    if (ConvaiNPCManager.Instance.activeConvaiNPC == null && ConvaiNPCManager.Instance.nearbyNPC == null)
+                    if (ConvaiNPCManager.Instance.activeConvaiNPC == null)
                         NotificationSystemHandler.Instance.NotificationRequest(NotificationType.NotCloseEnoughForConversation);
             }
             catch (NullReferenceException)

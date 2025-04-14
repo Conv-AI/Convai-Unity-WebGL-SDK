@@ -1477,7 +1477,7 @@ RectTransform:
   m_GameObject: {fileID: 1810488976853723189}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.12, y: 0.12, z: 0.12}
+  m_LocalScale: {x: 0.06, y: 0.06, z: 0.06}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1542938200028668496}
@@ -3747,10 +3747,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5777a8a41e942f5a05df965241ef598, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  rayLength: 4
-  visionConeAngle: 180
+  detectionDistance: 3
+  detectionFOVAngle: 120
   activeConvaiNPC: {fileID: 0}
-  nearbyNPC: {fileID: 0}
 --- !u!114 &3911711106281315888
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3763,7 +3762,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d36af226431e0b4ca3b21ff6bc84045, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  activeConvaiNPC: {fileID: 0}
   APIKey: 
 --- !u!1 &5182555592507896672
 GameObject:
@@ -4515,13 +4513,13 @@ MonoBehaviour:
     type: 3}
   characters:
   - characterGameObject: {fileID: 0}
+    characterName: Missy
+    characterTextColor: {r: 1, g: 0, b: 0, a: 1}
+  - characterGameObject: {fileID: 0}
     characterName: Steve
     characterTextColor: {r: 1, g: 0, b: 0, a: 1}
   - characterGameObject: {fileID: 0}
     characterName: Amelia
-    characterTextColor: {r: 1, g: 0, b: 0, a: 1}
-  - characterGameObject: {fileID: 0}
-    characterName: Missy
     characterTextColor: {r: 1, g: 0, b: 0, a: 1}
   playerName: Player
   playerTextColor: {r: 0.16216493, g: 1, b: 0, a: 1}

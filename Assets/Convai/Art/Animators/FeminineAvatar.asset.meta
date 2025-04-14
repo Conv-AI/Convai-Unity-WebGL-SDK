@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ee5b4be76dc64564ca28329f077f16b8
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9000000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 235621
+  packageName: NPC AI Engine - Dialog, actions, voice and lipsync - Convai
+  packageVersion: 3.2.4
+  assetPath: Assets/Convai/Demo/Avatars/FeminineAvatar.asset
+  uploadId: 737824

@@ -2625,7 +2625,6 @@ GameObject:
   m_Component:
   - component: {fileID: 6667240487094547286}
   - component: {fileID: 623432826458601461}
-  - component: {fileID: 2905628407434694203}
   - component: {fileID: 2116678390358549729}
   - component: {fileID: 6997586556901072132}
   - component: {fileID: 8688518770891932318}
@@ -2679,7 +2678,7 @@ Animator:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6875522479810710320}
   m_Enabled: 1
-  m_Avatar: {fileID: 9000000, guid: 135b456f38897dd40a0dcf22218087bb, type: 3}
+  m_Avatar: {fileID: 9000000, guid: ee5b4be76dc64564ca28329f077f16b8, type: 2}
   m_Controller: {fileID: 9100000, guid: f5248f05624463e4db81a8b35ac98aa7, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
@@ -2691,23 +2690,6 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &2905628407434694203
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6875522479810710320}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 247fc36ca2524089b3dc351f824e6a3e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  AvatarId: 63f8996d9dc8b8dcb3aff263
-  AvatarMetadata:
-    BodyType: 1
-    OutfitGender: 2
-    SkinTone: '#b66e50'
 --- !u!114 &2116678390358549729
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2725,10 +2707,10 @@ MonoBehaviour:
   sessionID: -1
   isCharacterTalking: 0
   isCharacterActive: 0
+  playerInteractionManager: {fileID: 0}
   onTriggerSent:
     m_PersistentCalls:
       m_Calls: []
-  playerInteractionManager: {fileID: 0}
 --- !u!114 &6997586556901072132
 MonoBehaviour:
   m_ObjectHideFlags: 0

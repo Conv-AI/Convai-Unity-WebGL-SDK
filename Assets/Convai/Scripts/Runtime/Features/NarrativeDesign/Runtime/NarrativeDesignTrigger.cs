@@ -58,7 +58,7 @@ namespace Convai.Scripts.Runtime.Features
             if (convaiNPC != null && availableTriggers != null && selectedTriggerIndex >= 0 && selectedTriggerIndex < availableTriggers.Count)
             {
                 string selectedTriggerName = availableTriggers[selectedTriggerIndex];
-                ConvaiNPCManager.Instance.SetActiveConvaiNPC(convaiNPC, false);
+                ConvaiNPCManager.Instance.SetActiveConvaiNPC(convaiNPC);
                 onTriggerEvent?.Invoke();
                 Debug.Log("Invoking trigger: " + selectedTriggerName);
                 convaiNPC.TriggerEvent(selectedTriggerName);
@@ -69,7 +69,7 @@ namespace Convai.Scripts.Runtime.Features
         {
             if (convaiNPC != null && !string.IsNullOrEmpty(message))
             {
-                ConvaiNPCManager.Instance.SetActiveConvaiNPC(convaiNPC, false);
+                ConvaiNPCManager.Instance.SetActiveConvaiNPC(convaiNPC);
                 onTriggerEvent?.Invoke();
                 convaiNPC.TriggerSpeech(message);
             }

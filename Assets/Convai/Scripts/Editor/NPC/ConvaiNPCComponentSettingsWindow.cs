@@ -1,9 +1,7 @@
-using System.IO;
 using Convai.Scripts.Runtime.Core;
 using Convai.Scripts.Runtime.Features;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace Convai.Scripts.Editor.NPC
 {
@@ -55,13 +53,13 @@ namespace Convai.Scripts.Editor.NPC
             EditorGUILayout.BeginVertical(GUI.skin.box);
             EditorGUIUtility.labelWidth = LABEL_WIDTH;
 
-            _convaiNPC.IncludeActionsHandler = EditorGUILayout.Toggle(new GUIContent("NPC Actions", "Decides if Actions Handler is included"), _convaiNPC.IncludeActionsHandler);
-            _convaiNPC.LipSync = EditorGUILayout.Toggle(new GUIContent("Lip Sync", "Decides if Lip Sync is enabled"), _convaiNPC.LipSync);
-            _convaiNPC.HeadEyeTracking = EditorGUILayout.Toggle(new GUIContent("Head & Eye Tracking", "Decides if Head & Eye tracking is enabled"), _convaiNPC.HeadEyeTracking);
-            _convaiNPC.EyeBlinking = EditorGUILayout.Toggle(new GUIContent("Eye Blinking", "Decides if Eye Blinking is enabled"), _convaiNPC.EyeBlinking);
-            _convaiNPC.NarrativeDesignManager = EditorGUILayout.Toggle(new GUIContent("Narrative Design Manager", "Decides if Narrative Design Manager is enabled"),
+            _convaiNPC.enableActionsHandler = EditorGUILayout.Toggle(new GUIContent("NPC Actions", "Decides if Actions Handler is included"), _convaiNPC.enableActionsHandler);
+            _convaiNPC.enableLipSync= EditorGUILayout.Toggle(new GUIContent("Lip Sync", "Decides if Lip Sync is enabled"), _convaiNPC.LipSync);
+            _convaiNPC.enableHeadEyeTracking= EditorGUILayout.Toggle(new GUIContent("Head & Eye Tracking", "Decides if Head & Eye tracking is enabled"), _convaiNPC.enableHeadEyeTracking);
+            _convaiNPC.enableEyeBlinking= EditorGUILayout.Toggle(new GUIContent("Eye Blinking", "Decides if Eye Blinking is enabled"), _convaiNPC.enableEyeBlinking);
+            _convaiNPC.enableNarrativeDesignManager= EditorGUILayout.Toggle(new GUIContent("Narrative Design Manager", "Decides if Narrative Design Manager is enabled"),
                 _convaiNPC.NarrativeDesignManager);
-            _convaiNPC.NarrativeDesignKeyController =
+            _convaiNPC.enableNarrativeDesignKeyController =
                 EditorGUILayout.Toggle(new GUIContent("Narrative Design Keys", "Adds handler for Narrative Design Keys for this character"),
                     _convaiNPC.NarrativeDesignKeyController);
 
@@ -84,12 +82,12 @@ namespace Convai.Scripts.Editor.NPC
         {
             if (_convaiNPC == null) return;
 
-            _convaiNPC.IncludeActionsHandler = _convaiNPC.GetComponent<ConvaiActionsHandler>() is not null;
-            _convaiNPC.LipSync = _convaiNPC.GetComponent<ConvaiLipSync>() != null;
-            _convaiNPC.HeadEyeTracking = _convaiNPC.GetComponent<ConvaiHeadTracking>() != null;
-            _convaiNPC.EyeBlinking = _convaiNPC.GetComponent<ConvaiBlinkingHandler>() != null;
-            _convaiNPC.NarrativeDesignManager = _convaiNPC.GetComponent<NarrativeDesignManager>() != null;
-            _convaiNPC.NarrativeDesignKeyController = _convaiNPC.GetComponent<NarrativeDesignKeyController>() is not null;
+            _convaiNPC.enableActionsHandler = _convaiNPC.GetComponent<ConvaiActionsHandler>() is not null;
+            _convaiNPC.enableLipSync = _convaiNPC.GetComponent<ConvaiLipSync>() != null;
+            _convaiNPC.enableHeadEyeTracking= _convaiNPC.GetComponent<ConvaiHeadTracking>() != null;
+            _convaiNPC.enableEyeBlinking = _convaiNPC.GetComponent<ConvaiBlinkingHandler>() != null;
+            _convaiNPC.enableNarrativeDesignManager = _convaiNPC.GetComponent<NarrativeDesignManager>() != null;
+            _convaiNPC.enableNarrativeDesignKeyController = _convaiNPC.GetComponent<NarrativeDesignKeyController>() is not null;
             Repaint();
         }
 
@@ -98,40 +96,30 @@ namespace Convai.Scripts.Editor.NPC
             if (!EditorUtility.DisplayDialog("Confirm Apply Changes", "Do you want to apply the following changes?", "Yes", "No"))
                 return;
 
-            ApplyComponent<ConvaiActionsHandler>(_convaiNPC.IncludeActionsHandler);
+            ApplyComponent<ConvaiActionsHandler>(_convaiNPC.enableActionsHandler);
             ApplyComponent<ConvaiLipSync>(_convaiNPC.LipSync);
-            ApplyComponent<ConvaiHeadTracking>(_convaiNPC.HeadEyeTracking);
-            ApplyComponent<ConvaiBlinkingHandler>(_convaiNPC.EyeBlinking);
-            ApplyComponent<NarrativeDesignManager>(_convaiNPC.NarrativeDesignManager);
-            ApplyComponent<NarrativeDesignKeyController>(_convaiNPC.NarrativeDesignKeyController);
+            ApplyComponent<ConvaiHeadTracking>(_convaiNPC.enableHeadEyeTracking);
+            ApplyComponent<ConvaiBlinkingHandler>(_convaiNPC.enableEyeBlinking);
+            ApplyComponent<NarrativeDesignManager>(_convaiNPC.enableNarrativeDesignManager);
+            ApplyComponent<NarrativeDesignKeyController>(_convaiNPC.enableNarrativeDesignKeyController);
 
         }
 
         private void ApplyComponent<T>(bool includeComponent) where T : Component
         {
             var component = _convaiNPC.GetComponent<T>();
-            var savedDataFileName = GetSavedDataFileName<T>();
 
             if (includeComponent)
             {
                 if (component == null)
                 {
                     component = _convaiNPC.gameObject.AddComponentSafe<T>();
-                    if (File.Exists(savedDataFileName))
-                        component.RestoreStateFromFile(savedDataFileName);
                 }
             }
             else if (component != null)
             {
-                component.SaveStateToFile(savedDataFileName);
                 DestroyImmediate(component);
             }
-        }
-
-        private string GetSavedDataFileName<T>() where T : Component
-        {
-            return Path.Combine(StateSaver.ROOT_DIRECTORY, _convaiNPC.characterID,
-                $"{SceneManager.GetActiveScene().name}_{_convaiNPC.characterID}_{typeof(T).Name}_State.data");
         }
     }
 }
