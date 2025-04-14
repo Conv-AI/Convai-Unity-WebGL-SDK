@@ -16,37 +16,37 @@ PrefabInstance:
     - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: 1.169
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: -2.739
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: -0.207
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
         type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.0000029504295
-      objectReference: {fileID: 0}
-    - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
-        type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
-        type: 3}
-      propertyPath: m_LocalRotation.y
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
         type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
+        type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
+        type: 3}
       propertyPath: m_LocalRotation.z
-      value: -0
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
         type: 3}
@@ -56,7 +56,7 @@ PrefabInstance:
     - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 180
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 771398030398563030, guid: 6c281cc73f7505f4fbdef39f95d456a1,
         type: 3}
@@ -68,7 +68,8 @@ PrefabInstance:
       propertyPath: m_Name
       value: Convai NPC Steve
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 4982524612659589340, guid: 6c281cc73f7505f4fbdef39f95d456a1, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []

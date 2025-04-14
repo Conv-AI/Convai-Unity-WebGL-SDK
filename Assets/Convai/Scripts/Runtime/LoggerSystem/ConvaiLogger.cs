@@ -69,8 +69,8 @@ namespace Convai.Scripts.Runtime.LoggerSystem
             string logMessage =
                 $"[{Enum.GetName(typeof(LogLevel), level)}][{Enum.GetName(typeof(LogCategory), category)}]: {formattedMessage}";
 
-            if (LevelColors.TryGetValue(level, out string color) && color != "default")
-                logMessage = $"<color={color}>{logMessage}</color>";
+            //if (LevelColors.TryGetValue(level, out string color) && color != "default")
+            //    logMessage = $"<color={color}>{logMessage}</color>";
 
             // Select the first frame that is from the non-ConvaiLogger type.
             StackTrace trace = new(2, true);

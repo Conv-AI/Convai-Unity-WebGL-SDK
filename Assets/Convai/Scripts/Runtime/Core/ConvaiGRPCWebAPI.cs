@@ -3,413 +3,617 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using Convai.Scripts.Runtime.Features;
+using Convai.Scripts.Runtime.LoggerSystem;
 using Convai.Scripts.Runtime.UI;
 using Convai.Scripts.Runtime.Utils;
 using UnityEngine;
 
 namespace Convai.Scripts.Runtime.Core
 {
-    /// <summary>
-    ///     Main class for handling Convai GRPC Web API.
-    /// </summary>
+    /// <summary>
+    /// Main class for handling Convai GRPC Web API interactions via JavaScript interop for WebGL.
+    /// Manages API key, interaction state, text I/O, visemes, actions, triggers, and narrative design callbacks.
+    /// </summary>
+    [DefaultExecutionOrder(-100)]
     public class ConvaiGRPCWebAPI : MonoBehaviour
     {
-        public static ConvaiGRPCWebAPI Instance; // Singleton instance
-        [HideInInspector] public ConvaiNPC activeConvaiNPC; // Active Convai NPC
-        [HideInInspector] public string APIKey; // API Key for Convai
-        private ConvaiObjectPool<AudioData> _audioDataPool;
-        private ConvaiChatUIHandler _convaiChatUIHandler; // UI handler for Convai chat
-        private string _lastReceivedText;
+        #region Singleton & Core References
+        // Singleton Instance
+        public static ConvaiGRPCWebAPI Instance { get; private set; }
 
-        private ConvaiObjectPool<VisemesData> _visemesDataPool;
+        [HideInInspector] public string APIKey; // Loaded from Resources
 
-        /// <summary>
-        ///     Awake is called when the script instance is being loaded.
-        /// </summary>
-        private void Awake()
+        // State
+        private ConvaiNPC _currentInteractingNPC; // The NPC currently targeted for interaction
+        private ConvaiNPC _interactionCandidateNPC; // The NPC currently in player focus (candidate)
+        private string _lastReceivedText = string.Empty; // Cache last text response for UI optimization
+        private float _audioVolume = 1.0f; // Internal cache for volume reported by JS
+
+        // Public getter for the currently interacting NPC
+        public ConvaiNPC CurrentInteractingNPC => _currentInteractingNPC;
+
+        // Component References
+        private ConvaiChatUIHandler _convaiChatUIHandler;
+
+        // Object Pools (Visemes only)
+        private ConvaiObjectPool<VisemesData> _visemesDataPool;
+
+        #endregion
+
+        #region Events
+        /// <summary>
+        /// Fired when the player starts (true) or stops (false) speaking via input key.
+        /// </summary>
+        public event Action<bool> OnPlayerSpeakingChanged;
+
+        /// <summary>
+        /// Fired when the character starts (true) or stops (false) speaking, based on JS callback.
+        /// </summary>
+        public event Action<bool> OnCharacterSpeakingChanged;
+        #endregion
+
+        #region Unity Lifecycle Methods
+
+        private void Awake()
         {
-            if (Instance == null)
+            // Singleton pattern
+            if (Instance == null)
+            {
                 Instance = this;
+            }
             else
+            {
+                ConvaiLogger.Warn($"Duplicate instance of {nameof(ConvaiGRPCWebAPI)} detected. Destroying this one.", ConvaiLogger.LogCategory.Character);
                 Destroy(gameObject);
+                return;
+            }
 
             _convaiChatUIHandler = FindObjectOfType<ConvaiChatUIHandler>();
-            try
+            if (_convaiChatUIHandler == null)
+                ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(ConvaiChatUIHandler)} not found. Chat UI updates skipped.", ConvaiLogger.LogCategory.Character);
+
+            // Load API Key
+            LoadAPIKey();
+
+            // Initialize required object pools
+            try
             {
-                initMicrophone();
+                _visemesDataPool = new ConvaiObjectPool<VisemesData>(15);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                Debug.LogWarning("WebGL SDK does not run in Unity Editor. Please build and run in WebGL.");
+                ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] Failed to initialize VisemesData pool: {e.Message}", ConvaiLogger.LogCategory.Character);
+                enabled = false; return;
             }
 
-            ConvaiAPIKeySetup apiKeyScriptableObject = Resources.Load<ConvaiAPIKeySetup>("ConvaiAPIKey");
+            // Initialize microphone (WebGL specific)
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try
+            {
+                initMicrophone();
+                ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] WebGL Microphone initialized successfully.", ConvaiLogger.LogCategory.Character);
+            }
+            catch (Exception ex)
+            {
+                ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] WebGL Microphone initialization failed: {ex.Message}", ConvaiLogger.LogCategory.Character);
+            }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] WebGL Microphone initialization skipped in Unity Editor.", ConvaiLogger.LogCategory.Character);
+#endif
+        }
 
-            if (apiKeyScriptableObject != null)
-                APIKey = apiKeyScriptableObject.APIKey;
-            else
-                Debug.LogError(
-                    "No API Key data found. Please complete the Convai Setup. In the Menu Bar, click Convai > Setup.");
-
-            _audioDataPool = new ConvaiObjectPool<AudioData>(10);
-            _visemesDataPool = new ConvaiObjectPool<VisemesData>(10);
+        // Using OnEnable/OnDisable for event subscription is robust for objects that might be deactivated/reactivated.
+        private void OnEnable()
+        {
+            // Subscribe to NPC manager events
+            if (ConvaiNPCManager.Instance != null)
+            {
+                ConvaiNPCManager.Instance.OnActiveNPCChanged += HandleInteractionCandidateChanged;
+                // Handle initially active NPC
+                HandleInteractionCandidateChanged(ConvaiNPCManager.Instance.activeConvaiNPC);
+            }
+            else if (Application.isPlaying) // Log error only during play mode
+            {
+                // Log error if the manager isn't available when this component enables
+                ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(ConvaiNPCManager)} instance not found. NPC targeting will fail.", ConvaiLogger.LogCategory.Character);
+            }
         }
 
-        private void Start()
+        private void OnDisable()
         {
-            ConvaiNPCManager.Instance.OnActiveNPCChanged += HandleActiveNPCChanged;
+            // Unsubscribe from events to prevent memory leaks
+            if (ConvaiNPCManager.Instance != null)
+            {
+                ConvaiNPCManager.Instance.OnActiveNPCChanged -= HandleInteractionCandidateChanged;
+            }
         }
 
-        private void OnDestroy()
+        // Using OnDestroy for final cleanup, though OnDisable handles most event unsubscriptions.
+        private void OnDestroy()
         {
-            ConvaiNPCManager.Instance.OnActiveNPCChanged -= HandleActiveNPCChanged;
-        }
-
-        /// <summary>
-        ///     Handles active NPC changed event. Will be called when the active NPC is changed.
-        /// </summary>
-        /// <param name="newActiveNPC"> Gets the new active NPC </param>
-        private void HandleActiveNPCChanged(ConvaiNPC newActiveNPC)
-        {
-            if (newActiveNPC == null) return;
-            activeConvaiNPC = newActiveNPC;
-
+            if (ConvaiNPCManager.Instance != null)
+            {
+                ConvaiNPCManager.Instance.OnActiveNPCChanged -= HandleInteractionCandidateChanged;
+            }
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            if (activeConvaiNPC.isInitialized) return;
-
-            string templateKeyJSON = String.Empty;
-            string actionConfig = String.Empty;
-
-            if (activeConvaiNPC.ConvaiNarrativeDesignKeyController != null)
-            {
-                templateKeyJSON = JsonUtility.ToJson(activeConvaiNPC.ConvaiNarrativeDesignKeyController.narrativeDesignKeyController);
-            }
-
-            if (activeConvaiNPC.ConvaiActionsHandler != null)
-            {
-                actionConfig = JsonUtility.ToJson(activeConvaiNPC.ConvaiActionsHandler.ActionConfig);
-            }
-
-            if (string.IsNullOrEmpty(templateKeyJSON))
-            {
-                InitializeConvaiClient(activeConvaiNPC.characterID, true, false, actionConfig);
-            }
-            else
-            {
-                InitializeConvaiClient(activeConvaiNPC.characterID, true, false, actionConfig, templateKeyJSON);
-            }
-            activeConvaiNPC.isInitialized = true;
+            try { interruptCharacter(); } catch (Exception e) { ConvaiLogger.Error($"JS call interruptCharacter failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
 #else
-            Debug.LogWarning("WebGL SDK does not run in Unity Editor. Please build and run in WebGL.");
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: interruptCharacter() called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
 #endif
         }
 
-        /// <summary>
-        ///     Converts 16 bit byte array to float audio clip data.
-        /// </summary>
-        private float[] Convert16BitByteArrayToFloatAudioClipData(byte[] source)
+        #endregion
+
+        #region Interaction Management
+        /// <summary>
+        /// Sets the target NPC for interaction, handling initialization and interruptions.
+        /// Called internally based on player actions or NPC manager events.
+        /// </summary>
+        /// <param name="targetNPC">The new NPC target, or null to clear.</param>
+        private void SetInteractionTarget(ConvaiNPC targetNPC)
         {
-            int convertedSize = source.Length / sizeof(short);
-            float[] data = new float[convertedSize];
-
-            int byteIdx = 0;
-            int dataIdx = 0;
-
-            while (byteIdx < source.Length)
+            // Case 1: Clearing the target
+            if (targetNPC == null)
             {
-                short sample = BitConverter.ToInt16(source, byteIdx);
-                float normalizedSample = sample / 32768.0f;
-
-                data[dataIdx] = normalizedSample;
-
-                byteIdx += sizeof(short);
-                dataIdx++;
+                if (_currentInteractingNPC != null)
+                {
+                    ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Interaction target cleared. Previous: {_currentInteractingNPC.name}", ConvaiLogger.LogCategory.Character);
+                    // Interrupt any ongoing speech from the previous target
+                    InterruptCharacterSpeechInternal();
+                    _currentInteractingNPC = null;
+                }
+                return;
             }
 
-            return data;
-        }
-
-        /// <summary>
-        ///     Processes byte audio data to audio clip.
-        /// </summary>
-        public AudioClip ProcessByteAudioDataToAudioClip(byte[] byteAudio, string stringSampleRate)
-        {
-            float[] samples = Convert16BitByteArrayToFloatAudioClipData(byteAudio);
-
-            int channels = 1;
-            int sampleRate = int.Parse(stringSampleRate);
-
-            if (samples.Length > 0)
+            // Case 2: Targeting the same NPC again
+            if (_currentInteractingNPC == targetNPC)
             {
-                AudioClip clip = AudioClip.Create("ClipName", samples.Length, channels, sampleRate, false);
-                clip.SetData(samples, 0);
-                return clip;
+                // If the same NPC is already talking, interrupt it to allow player input.
+                if (_currentInteractingNPC.isCharacterTalking)
+                {
+                    ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Re-interacting with talking NPC: {_currentInteractingNPC.name}. Interrupting.", ConvaiLogger.LogCategory.Character);
+                    InterruptCharacterSpeechInternal();
+                }
+                // No need to re-initialize if it's the same target.
+                return;
             }
 
-            return null;
+            // Case 3: Switching target from one NPC to another
+            // If the *previous* NPC was talking, interrupt it.
+            if (_currentInteractingNPC != null && _currentInteractingNPC.isCharacterTalking)
+            {
+                ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Switching target. Interrupting previous NPC: {_currentInteractingNPC.name}", ConvaiLogger.LogCategory.Character);
+                InterruptCharacterSpeechInternal(); // Interrupt the old one
+            }
+
+            // Set the new NPC as the current target
+            _currentInteractingNPC = targetNPC;
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Setting interaction target to: {_currentInteractingNPC.name}", ConvaiLogger.LogCategory.Character);
+
+            // Initialize the JS client for the new target NPC
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // Prepare configurations
+            string templateKeyJSON = GetJsonString(_currentInteractingNPC.NarrativeDesignKeyController?.narrativeDesignKeyController, "NarrativeDesign Keys");
+            string actionConfigJSON = GetJsonString(_currentInteractingNPC.ActionsHandler?.ActionConfig, "Action Config");
+
+            // Call the internal wrapper for JS client initialization
+            InitializeConvaiClientWrapper(
+                _currentInteractingNPC.characterID,
+                enableAudioRecorder: true,
+                actionConfigJson: actionConfigJSON,
+                templateKeysJson: templateKeyJSON
+            );
+#else
+            // Call wrapper even in editor to log the skip message
+            InitializeConvaiClientWrapper(_currentInteractingNPC.characterID, true, "", "");
+#endif
+        }
+
+        /// <summary>
+        /// Handles changes in the potential NPC interaction candidate reported by the NPC Manager.
+        /// Updates the internal candidate reference.
+        /// </summary>
+        private void HandleInteractionCandidateChanged(ConvaiNPC newCandidateNPC)
+        {
+            _interactionCandidateNPC = newCandidateNPC;
         }
 
-        /// <summary>
-        ///     Processes byte audio data to trimmed audio clip.
-        /// </summary>
-        public AudioClip ProcessByteAudioDataToTrimmedAudioClip(byte[] byteAudio, string stringSampleRate)
+        /// <summary>
+        /// Internal method to signal speech interruption via JavaScript and perform local cleanup.
+        /// </summary>
+        private void InterruptCharacterSpeechInternal()
         {
-            // trim 44 bytes of header
+            if (_currentInteractingNPC == null) return; // No target to interrupt
 
-            byte[] trimmedByteAudio = new byte[byteAudio.Length - 44];
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Requesting JS interrupt for {_currentInteractingNPC.name}", ConvaiLogger.LogCategory.Character);
 
-            for (int i = 0, j = 44; i < byteAudio.Length - 44; i++, j++) trimmedByteAudio[i] = byteAudio[j];
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { interruptCharacter(); } catch (Exception e) { ConvaiLogger.Error($"JS call interruptCharacter failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: interruptCharacter() called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
 
-            float[] samples = Convert16BitByteArrayToFloatAudioClipData(trimmedByteAudio);
+            // Ensure local NPC state reflects the interruption immediately
+            // Use the ForceStop method on the NPC
+            _currentInteractingNPC.ForceStopLocalPlaybackAndAnimation();
 
-            int channels = 1;
-            int sampleRate = int.Parse(stringSampleRate);
+            // Immediately notify C# listeners that the character *should* have stopped speaking.
+            OnCharacterSpeakingChanged?.Invoke(false);
 
-            if (samples.Length > 0)
+            // Interrupted
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Character interrupted: {_currentInteractingNPC.name}", ConvaiLogger.LogCategory.Character);
+        }
+
+        #endregion
+
+        #region Public API Methods (Called by C# scripts like PlayerInteractionManager)
+
+        /// <summary>
+        /// Requests to start recording audio. Sets the interaction target to the current candidate first.
+        /// </summary>
+        public void RequestStartRecordAudio()
+        {
+            // Set/Confirm the interaction target before starting audio
+            SetInteractionTarget(_interactionCandidateNPC);
+
+            if (_currentInteractingNPC == null)
             {
-                AudioClip clip = AudioClip.Create("ClipName", samples.Length, channels, sampleRate, false);
-                clip.SetData(samples, 0);
-                return clip;
+                ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(RequestStartRecordAudio)} failed: No interaction target NPC set. Is player looking at an NPC?", ConvaiLogger.LogCategory.Character);
+                return;
             }
 
-            return null;
-        }
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(RequestStartRecordAudio)} for {_currentInteractingNPC.name}", ConvaiLogger.LogCategory.Character);
+            OnPlayerSpeakingChanged?.Invoke(true); // Notify listeners
 
-        /// <summary>
-        ///     Initializes Convai with given parameters.
-        /// </summary>
-        public void InitializeConvaiClient(string characterID, bool enableAudioRecorder, bool enableAudioPlayer, string actionConfig = "", string templateKeys = "")
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { startAudioChunk(); } catch (Exception e) { ConvaiLogger.Error($"JS call startAudioChunk failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: startAudioChunk() called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+        }
+
+        /// <summary>
+        /// Requests to stop recording audio for the currently interacting NPC.
+        /// </summary>
+        public void RequestStopRecordAudio()
         {
-            Debug.Log("Character ID: " + activeConvaiNPC.characterID);
-
-            if (string.IsNullOrEmpty(templateKeys))
+            // No need to SetInteractionTarget here, stop applies to the current target.
+            if (_currentInteractingNPC == null)
             {
-                initializeConvaiClient(APIKey, characterID, enableAudioRecorder, enableAudioPlayer, actionConfig);
+                ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(RequestStopRecordAudio)} called but no NPC was interacting.", ConvaiLogger.LogCategory.Character);
+                OnPlayerSpeakingChanged?.Invoke(false); // Ensure state reset
+                return;
             }
-            else
+
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(RequestStopRecordAudio)} called for {_currentInteractingNPC.name}", ConvaiLogger.LogCategory.Character);
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { endAudioChunk(); } catch (Exception e) { ConvaiLogger.Error($"JS call endAudioChunk failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: endAudioChunk() called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+            OnPlayerSpeakingChanged?.Invoke(false); // Notify listeners
+        }
+
+        /// <summary>
+        /// Requests to send text data. Sets the interaction target to the current candidate first.
+        /// </summary>
+        /// <param name="text">The text message to send.</param>
+        public void RequestSendTextData(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(RequestSendTextData)} called with empty text.", ConvaiLogger.LogCategory.Character); return; }
+
+            // Set/Confirm the interaction target before sending text
+            SetInteractionTarget(_interactionCandidateNPC);
+
+            if (_currentInteractingNPC == null)
             {
-                initializeConvaiClient(APIKey, characterID, enableAudioRecorder, enableAudioPlayer, actionConfig, templateKeys);
+                ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(RequestSendTextData)} failed: No interaction target NPC set. Is player looking at an NPC?", ConvaiLogger.LogCategory.Character);
+                return;
             }
+
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(RequestSendTextData)} for {_currentInteractingNPC.name}: {text}", ConvaiLogger.LogCategory.Character);
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+             try { sendTextRequest(text); } catch (Exception e) { ConvaiLogger.Error($"JS call sendTextRequest failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: sendTextRequest('{text}') called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+        }
+
+        /// <summary>
+        /// Sends interaction feedback (like/dislike) via the JavaScript library.
+        /// </summary>
+        public void SendFeedback(string characterID, string sessionID, bool thumbsUp, string feedbackText)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { sendFeedback(characterID, sessionID, thumbsUp, feedbackText); } catch (Exception e) { ConvaiLogger.Error($"JS call sendFeedback failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: sendFeedback(CharID: {characterID}, Session: {sessionID}, Like: {thumbsUp}, Text: {feedbackText}) called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+        }
+
+        /// <summary>
+        /// Sends a trigger name and message via the JavaScript library to the current active NPC.
+        /// </summary>
+        /// <param name="triggerConfig">Configuration containing the trigger name and message.</param>
+        public void SendTriggerConfig(TriggerConfig triggerConfig) // Assumes TriggerConfig is defined elsewhere
+        {
+            // Uses _currentInteractingNPC which should be set by SetInteractionTarget via Requests methods
+            if (_currentInteractingNPC == null) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(SendTriggerConfig)} called, but no active NPC.", ConvaiLogger.LogCategory.Character); return; }
+            if (triggerConfig == null) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(SendTriggerConfig)} called with null config.", ConvaiLogger.LogCategory.Character); return; }
+
+            string triggerName = triggerConfig.TriggerName ?? string.Empty;
+            string triggerMessage = triggerConfig.TriggerMessage ?? string.Empty;
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Sending Trigger: Name='{triggerName}', Message='{triggerMessage}' to {_currentInteractingNPC.name}", ConvaiLogger.LogCategory.Character);
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { sendTriggerData(triggerName, triggerMessage); } catch (Exception e) { ConvaiLogger.Error($"JS call sendTriggerData failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: sendTriggerData(Name: {triggerName}, Msg: {triggerMessage}) called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+        }
+
+        /// <summary>
+        /// Updates the Action Configuration on the JavaScript side for the current active NPC.
+        /// </summary>
+        /// <param name="actionConfig">The action configuration object (type assumed defined elsewhere).</param>
+        public void UpdateActionConfig(ActionConfig actionConfig) // Assumes ActionConfig is defined elsewhere
+        {
+            // Uses _currentInteractingNPC which should be set by SetInteractionTarget via Requests methods
+            if (_currentInteractingNPC == null) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(UpdateActionConfig)} called, but no active NPC.", ConvaiLogger.LogCategory.Character); return; }
+            if (actionConfig == null) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(UpdateActionConfig)} called with null config for {_currentInteractingNPC.name}.", ConvaiLogger.LogCategory.Character); return; }
+
+            string actionConfigJson = GetJsonString(actionConfig, "Action Config for Update");
+            if (string.IsNullOrEmpty(actionConfigJson)) return;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+             try { setActionConfig(actionConfigJson); } catch (Exception e) { ConvaiLogger.Error($"JS call setActionConfig failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: setActionConfig('{actionConfigJson}') called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+        }
+
+        /// <summary>
+        /// Public method to explicitly request interruption of the currently speaking character.
+        /// </summary>
+        public void InterruptCharacterSpeech()
+        {
+            // Calls the internal method that handles JS call and local state update
+            InterruptCharacterSpeechInternal();
         }
 
-        /// <summary>
-        ///     Starts recording audio.
-        /// </summary>
-        public void StartRecordAudio()
+        #endregion
+
+        #region Audio Control Methods
+
+        /// <summary> Toggles the audio playback volume (mute/unmute) via JS interop. </summary>
+        public void ToggleAudioVolume()
         {
-            OnPlayerSpeakingChanged?.Invoke(true);
-            startAudioChunk();
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { toggleAudioVolume(); } catch (Exception e) { ConvaiLogger.Error($"JS call toggleAudioVolume failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: toggleAudioVolume() called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+        }
+
+        /// <summary> Pauses audio playback via JS interop. </summary>
+        public void PauseAudio()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { pauseAudio(); } catch (Exception e) { ConvaiLogger.Error($"JS call pauseAudio failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: pauseAudio() called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+        }
+
+        /// <summary> Resumes paused audio playback via JS interop. </summary>
+        public void ResumeAudio()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { resumeAudio(); } catch (Exception e) { ConvaiLogger.Error($"JS call resumeAudio failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: resumeAudio() called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+        }
+
+        /// <summary> Gets the last known audio volume level (set via SetAudioVolume callback). </summary>
+        public float GetAudioVolume()
+        {
+            // Request update from JS side; value is returned via SetAudioVolume callback.
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { getAudioVolume(); } catch (Exception e) { ConvaiLogger.Error($"JS call getAudioVolume failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#endif
+            return _audioVolume; // Return cached value
+        }
+
+        #endregion
+
+        #region Callbacks from JavaScript (Invoked by JSLib)
+
+        /// <summary> Callback for user's transcribed text. Updates UI. </summary>
+        public void OnUserResponseReceived(string text)
+        {
+            _convaiChatUIHandler?.SendPlayerText(text);
         }
 
-        /// <summary>
-        ///     Stops recording audio.
-        /// </summary>
-        public void StopRecordAudio()
+        /// <summary> Callback for character's text response. Updates UI, prevents duplicates. </summary>
+        public void OnTextResponseReceived(string responseText)
         {
-            endAudioChunk();
-            OnPlayerSpeakingChanged?.Invoke(false);
-        }
-
-        /// <summary>
-        ///     Sends text data to Convai.
-        /// </summary>
-        public void SendTextData(string text)
-        {
-            sendTextRequest(text);
-        }
-
-        /// <summary>
-        ///     Receives the text and sends it to the UI handler for displaying
-        /// </summary>
-        /// <param name="text"> The text response sent from jslib </param>
-        public void OnUserResponseReceived(string text)
-        {
+            if (_currentInteractingNPC == null) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(OnTextResponseReceived)} ignored: No active NPC.", ConvaiLogger.LogCategory.Character); return; }
             if (_convaiChatUIHandler == null) return;
 
-            if (!string.IsNullOrWhiteSpace(text))
+            // Update UI only if text is new and not empty
+            if (!string.IsNullOrEmpty(responseText) && responseText != _lastReceivedText)
             {
-                _convaiChatUIHandler.SendPlayerText(text);
-            }
+                _convaiChatUIHandler.SendCharacterText(_currentInteractingNPC.characterName, responseText);
+                _lastReceivedText = responseText; // Update cache
+            }
         }
 
-        /// <summary>
-        ///     Handles audio response received event.
-        /// </summary>
-        public void OnAudioResponseReceived(string audData)
+        /// <summary> Callback reporting current audio volume from JS. Updates local cache. </summary>
+        public void SetAudioVolume(string volume)
         {
-            try
+            if (float.TryParse(volume, NumberStyles.Any, CultureInfo.InvariantCulture, out float parsedVolume))
             {
-                AudioData audioData = _audioDataPool.GetObject();
-
-                JsonUtility.FromJsonOverwrite(audData, audioData);
-
-
-                if (audioData == null)
-                {
-                    Debug.LogError("Deserialization returned null");
-                    return;
-                }
-
-                if (!audioData.hasVisemesData) activeConvaiNPC.AddAudioData(audioData);
-
-                if (audioData.resText != _lastReceivedText)
-                    if (!string.IsNullOrEmpty(audioData.resText))
-                    {
-                        _convaiChatUIHandler.SendCharacterText(activeConvaiNPC.characterName, audioData.resText);
-                        _lastReceivedText = audioData.resText;
-                    }
-
-                _audioDataPool.ReleaseObject(audioData);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("Error Deserializing Audio Data: " + e.Message);
-                throw;
-            }
-        }
-
-        public void OnVisemeResponseReceived(string visemeData)
-        {
-            try
-            {
-                string[] dataValues = visemeData.Trim('[', ']').Split(',');
-
-                Viseme viseme = new();
-
-                int loopCount = Mathf.Min(dataValues.Length, 15);
-
-                for (int i = 0; i < loopCount; i++)
-                    if (dataValues[i] != "null" && float.TryParse(dataValues[i], NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
-                        viseme.SetFieldValue(i, value);
-
-                VisemesData visemesData = _visemesDataPool.GetObject();
-
-                visemesData.Visemes = viseme;
-                ProcessVisemeData(visemesData);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("Error Deserializing Viseme Data: " + e.Message);
-                throw;
-            }
-        }
-
-        public void OnBTResponseReceived(string narrativeSectionID)
-        {
-            if (activeConvaiNPC.ConvaiNarrativeDesignManager != null)
-            {
-                Debug.Log("narrativeSectionID: " + narrativeSectionID);
-                activeConvaiNPC.ConvaiNarrativeDesignManager.UpdateCurrentSection(narrativeSectionID);
-            }
-        }
-
-        public void OnActionResponseReceived(string actionResponse)
-        {
-            if (activeConvaiNPC.ConvaiActionsHandler != null)
-            {
-                activeConvaiNPC.ConvaiActionsHandler.actionResponseList.Add(actionResponse);
-            }
-        }
-
-        private void ProcessVisemeData(VisemesData visemesData)
-        {
-            if (visemesData.Visemes.Sil == -2)
-            {
-                if (activeConvaiNPC.ConvaiLipSync.FaceDataList == null) activeConvaiNPC.ConvaiLipSync.FaceDataList = new List<List<VisemesData>>();
-
-                activeConvaiNPC.ConvaiLipSync.FaceDataList.Add(new List<VisemesData>());
-            }
+                _audioVolume = Mathf.Clamp01(parsedVolume); // Clamp between 0 and 1
+            }
             else
             {
-                if (activeConvaiNPC.ConvaiLipSync.FaceDataList == null || activeConvaiNPC.ConvaiLipSync.FaceDataList.Count == 0) return;
-
-                activeConvaiNPC.ConvaiLipSync.FaceDataList[activeConvaiNPC.ConvaiLipSync.FaceDataList.Count - 1].Add(visemesData);
+                ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] Failed to parse audio volume value: {volume}", ConvaiLogger.LogCategory.Character);
             }
         }
 
-        /// <summary>
-        ///     Sends feedback to Convai.
-        /// </summary>
-        /// <param name="characterID"></param>
-        /// <param name="sessionID"></param>
-        /// <param name="thumbsUp"></param>
-        /// <param name="feedbackText"></param>
-        public void SendFeedback(string characterID, string sessionID, bool thumbsUp, string feedbackText)
+        /// <summary> Callback reporting character speaking status from JS. Invokes C# event. </summary>
+        public void SetTalkingStatus(string talkingStatus)
         {
-            sendFeedback(characterID, sessionID, thumbsUp, feedbackText);
+            switch (talkingStatus)
+            {
+                case "true":
+                    OnCharacterSpeakingChanged?.Invoke(true);
+                    break;
+                case "false":
+                    OnCharacterSpeakingChanged?.Invoke(false);
+                    break;
+            }
         }
 
-        public void SendTriggerConfig(TriggerConfig triggerConfig)
+        /// <summary> Callback for viseme data stream from JS. </summary>
+        public void OnVisemeResponseReceived(string visemeDataString)
         {
-            string triggerName = triggerConfig.TriggerName;
-            string triggerMessage = triggerConfig.TriggerMessage;
+            if (_currentInteractingNPC?.LipSync == null) return; // Ignore if no target or target has no LipSync
+            if (string.IsNullOrWhiteSpace(visemeDataString) || visemeDataString.Length <= 2) return; // Ignore empty "[]"
 
-            Debug.Log("Sending Trigger Data: " + triggerName + " : " + triggerMessage);
-            sendTriggerData(triggerName, triggerMessage);
+            VisemesData pooledVisemesData = null;
+            try
+            {
+                string[] dataValues = visemeDataString.Trim('[', ']').Split(',');
+                Viseme visemeStruct = new Viseme();
+                int loopCount = Mathf.Min(dataValues.Length, 15);
+                for (int i = 0; i < loopCount; i++)
+                {
+                    if (float.TryParse(dataValues[i], NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
+                        visemeStruct.SetFieldValue(i, value);
+                }
+                pooledVisemesData = _visemesDataPool.GetObject();
+                pooledVisemesData.Visemes = visemeStruct;
+                ProcessVisemeData(pooledVisemesData);
+            }
+            catch (Exception e) { ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] Viseme Processing Error: {e.Message}\nData: {visemeDataString}", ConvaiLogger.LogCategory.Character); }
+            finally { if (pooledVisemesData != null && _visemesDataPool != null) _visemesDataPool.ReleaseObject(pooledVisemesData); }
         }
 
-        public void UpdateActionConfig(ActionConfig actionConfig)
+        /// <summary> Callback for Narrative Design/Behaviour Tree section updates from JS. </summary>
+        public void OnBTResponseReceived(string narrativeSectionID)
         {
-            setActionConfig(JsonUtility.ToJson(actionConfig));
+            if (_currentInteractingNPC?.NarrativeDesignManager == null) return; // Ignore if no target/component
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Narrative Section ID Received for {_currentInteractingNPC.name}: {narrativeSectionID}", ConvaiLogger.LogCategory.Character);
+            _currentInteractingNPC.NarrativeDesignManager.UpdateCurrentSection(narrativeSectionID);
         }
 
-        /// <summary>
-        ///     Interrupts the character speech.
-        /// </summary>
-        public void InterruptCharacterSpeech()
+        /// <summary> Callback for Action responses from JS. </summary>
+        public void OnActionResponseReceived(string actionResponse)
         {
-            interruptCharacter();
+            if (_currentInteractingNPC?.ActionsHandler == null) return; // Ignore if no target/component
+            if (_currentInteractingNPC.ActionsHandler.actionResponseList == null)
+                _currentInteractingNPC.ActionsHandler.actionResponseList = new List<string>();
+            _currentInteractingNPC.ActionsHandler.actionResponseList.Add(actionResponse);
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Action Response Received for {_currentInteractingNPC.name}: {actionResponse}", ConvaiLogger.LogCategory.Character);
         }
 
-        #region Events
+        #endregion
 
-        // Events to notify when the player starts or stops speaking
-        public event Action<bool> OnPlayerSpeakingChanged;
+        #region Internal Helper Methods
+
+        /// <summary> Loads the API key from the 'ConvaiAPIKey' ScriptableObject in Resources. </summary>
+        private void LoadAPIKey()
+        {
+            try
+            {
+                ConvaiAPIKeySetup keySetup = Resources.Load<ConvaiAPIKeySetup>("ConvaiAPIKey");
+                if (keySetup != null && !string.IsNullOrEmpty(keySetup.APIKey)) { APIKey = keySetup.APIKey; }
+                else { APIKey = string.Empty; ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] Convai API Key ('Resources/ConvaiAPIKey.asset') not found or empty. Use Convai > Setup menu.", ConvaiLogger.LogCategory.Character); }
+            }
+            catch (Exception e) { ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] Error loading API Key: {e.Message}", ConvaiLogger.LogCategory.Character); APIKey = string.Empty; }
+        }
+
+        /// <summary> Internal wrapper to initialize the Convai JS client via DllImport. </summary>
+        private void InitializeConvaiClientWrapper(string characterID, bool enableAudioRecorder, string actionConfigJson = "", string templateKeysJson = "")
+        {
+            if (string.IsNullOrEmpty(APIKey) || string.IsNullOrEmpty(characterID)) { ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] Cannot initialize client: Missing API Key or Character ID.", ConvaiLogger.LogCategory.Character); return; }
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] Requesting JS Client Init for Character: {characterID}", ConvaiLogger.LogCategory.Character);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { initializeConvaiClient(APIKey, characterID, enableAudioRecorder, actionConfigJson, templateKeysJson); }
+            catch (Exception e) { ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] JS call initializeConvaiClient failed for {characterID}: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Client init skipped in Editor for {characterID}.", ConvaiLogger.LogCategory.Character);
+#endif
+        }
+
+        /// <summary> Processes viseme data, copying the value to the NPC's LipSync component safely. </summary>
+        private void ProcessVisemeData(VisemesData pooledVisemesData)
+        {
+            if (_currentInteractingNPC?.LipSync == null) return;
+            try
+            {
+                Viseme visemeValue = pooledVisemesData.Visemes;
+                if (visemeValue.Sil == -2)
+                {
+                    if (_currentInteractingNPC.LipSync.FaceDataList == null)
+                        _currentInteractingNPC.LipSync.FaceDataList = new List<List<VisemesData>>();
+                    _currentInteractingNPC.LipSync.FaceDataList.Add(new List<VisemesData>());
+                }
+                else
+                {
+                    List<List<VisemesData>> faceDataList = _currentInteractingNPC.LipSync.FaceDataList;
+                    if (faceDataList == null || faceDataList.Count == 0) return;
+                    VisemesData dataCopy = new VisemesData { Visemes = visemeValue };
+                    faceDataList[faceDataList.Count - 1].Add(dataCopy);
+                }
+            }
+            catch (Exception e) { ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] Error processing viseme: {e.Message}", ConvaiLogger.LogCategory.Character); }
+        }
+
+        /// <summary> Helper to safely convert an object to JSON string. </summary>
+        /// <param name="obj">Object to serialize.</param>
+        /// <param name="context">Context string for error logging.</param>
+        /// <returns>JSON string or empty string if null or error.</returns>
+        private string GetJsonString(object obj, string context)
+        {
+            if (obj == null) return string.Empty;
+            try
+            {
+                return JsonUtility.ToJson(obj);
+            }
+            catch (Exception e)
+            {
+                string npcName = _currentInteractingNPC != null ? _currentInteractingNPC.name : "Unknown NPC";
+                ConvaiLogger.Error($"[{nameof(ConvaiGRPCWebAPI)}] Error serializing {context} for {npcName}: {e.Message}", ConvaiLogger.LogCategory.Character);
+                return string.Empty;
+            }
+        }
 
         #endregion
 
-        #region External Functions
+        #region External JavaScript Functions (DllImport)
 
-        [DllImport("__Internal")]
-        private static extern void startAudioChunk(); // Starts audio chunk
-
-        [DllImport("__Internal")]
-        private static extern void endAudioChunk(); // Ends audio chunk
-
-        [DllImport("__Internal")]
-        private static extern void initializeConvaiClient(string apiKey, string characterId, bool enableAudioRecorder, bool enableAudioPlayer, string actionConfig = "", string templateKeys = ""); // Initializes Convai client
-
-        [DllImport("__Internal")]
-        private static extern void initMicrophone(); // Initializes microphone
-
-        [DllImport("__Internal")]
-        private static extern void sendTextRequest(string request); // Sends text request
-
-        [DllImport("__Internal")]
-        private static extern void sendFeedback(string character_id, string session_id, bool thumbs_up, string feedback_text);
-
-        [DllImport("__Internal")]
-        private static extern void sendTriggerData(string triggerName, string triggerMessage);
-
-        [DllImport("__Internal")]
-        private static extern void setActionConfig(string actionConfig);
-
-        [DllImport("__Internal")]
-        private static extern void interruptCharacter();
-
+#if UNITY_WEBGL && !UNITY_EDITOR
+        // Ensure this matches the actual JS function signature, including defaults if used
+        [DllImport("__Internal")] private static extern void initMicrophone();
+        [DllImport("__Internal")] private static extern void startAudioChunk();
+        [DllImport("__Internal")] private static extern void endAudioChunk();
+        [DllImport("__Internal")] private static extern void initializeConvaiClient(string apiKey, string characterId, bool enableAudioRecorder, string actionConfig = "", string templateKeys = "");
+        [DllImport("__Internal")] private static extern void sendTextRequest(string request);
+        [DllImport("__Internal")] private static extern void sendFeedback(string character_id, string session_id, bool thumbs_up, string feedback_text);
+        [DllImport("__Internal")] private static extern void sendTriggerData(string triggerName, string triggerMessage);
+        [DllImport("__Internal")] private static extern void setActionConfig(string actionConfigJson);
+        [DllImport("__Internal")] private static extern void interruptCharacter();
+        [DllImport("__Internal")] private static extern void toggleAudioVolume();
+        [DllImport("__Internal")] private static extern void pauseAudio();
+        [DllImport("__Internal")] private static extern void resumeAudio();
+        [DllImport("__Internal")] private static extern void getAudioVolume();
+#endif
         #endregion
     }
-}
-
-/// <summary>
-///     Class to hold audio data.
-/// </summary>
-public class AudioData
-{
-    public byte[] audData; // Audio data in byte array
-    public bool hasVisemesData; // Check for audio stream to have visemes data
-    public bool isFirst; // Flag to check if it's the first audio data
-    public string resText; // Response text
-    public int sampleRate; // Sample rate of the audio data
 }
