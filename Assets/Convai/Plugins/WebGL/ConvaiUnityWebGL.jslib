@@ -119,7 +119,7 @@ var ConvaiUnityWebGL = {
                 if (audioResponse.hasVisemesData()) {
                     visemeData = audioResponse.getVisemesData();
                     if (visemeData && visemeData.toObject) {
-                        var visemeArray = visemeData.array[0]
+                        var visemeArray = visemeData.u;
                         SendMessage("ConvaiGRPCWebAPI", "OnVisemeResponseReceived", JSON.stringify(visemeArray));
                     }
                 }
@@ -192,6 +192,28 @@ var ConvaiUnityWebGL = {
         }
         this.convaiClient.sendFeedback(this.interactionId, UTF8ToString(character_id), UTF8ToString(session_id), thumbs_up, UTF8ToString(feedback_text));
     },
+
+    updateNarrativeDesignKeys: function (templateKeys) {
+
+        let NDTemplateKeys;
+        templateKeys = UTF8ToString(templateKeys);
+
+        if (templateKeys) {
+            const parsedData = JSON.parse(templateKeys);
+            NDTemplateKeys = new Map();
+
+            if (Array.isArray(parsedData.narrativeDesignKeys)) {
+                parsedData.narrativeDesignKeys.forEach(item => {
+                    if (item.name && item.value) {
+                        NDTemplateKeys.set(item.name, item.value);
+                    }
+                });
+            }
+
+            this.convaiClient.updateNarrativeTemplate(NDTemplateKeys);
+            NDTemplateKeys.forEach((value, key) => console.log("Key:", key, "Value:", value));
+        }
+    }
 };
 
 mergeInto(LibraryManager.library, ConvaiUnityWebGL);

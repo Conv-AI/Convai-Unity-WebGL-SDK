@@ -216,6 +216,7 @@ namespace Convai.Scripts.Runtime.Core
         /// </summary>
         private void HandleInteractionCandidateChanged(ConvaiNPC newCandidateNPC)
         {
+            Debug.Log("New Candidate: " + newCandidateNPC);
             _interactionCandidateNPC = newCandidateNPC;
         }
 
@@ -340,6 +341,8 @@ namespace Convai.Scripts.Runtime.Core
         /// <param name="triggerConfig">Configuration containing the trigger name and message.</param>
         public void SendTriggerConfig(TriggerConfig triggerConfig) // Assumes TriggerConfig is defined elsewhere
         {
+            SetInteractionTarget(_interactionCandidateNPC); // Ensure target is set
+
             // Uses _currentInteractingNPC which should be set by SetInteractionTarget via Requests methods
             if (_currentInteractingNPC == null) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(SendTriggerConfig)} called, but no active NPC.", ConvaiLogger.LogCategory.Character); return; }
             if (triggerConfig == null) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(SendTriggerConfig)} called with null config.", ConvaiLogger.LogCategory.Character); return; }
@@ -361,6 +364,8 @@ namespace Convai.Scripts.Runtime.Core
         /// <param name="actionConfig">The action configuration object (type assumed defined elsewhere).</param>
         public void UpdateActionConfig(ActionConfig actionConfig) // Assumes ActionConfig is defined elsewhere
         {
+            SetInteractionTarget(_interactionCandidateNPC); // Ensure target is set
+
             // Uses _currentInteractingNPC which should be set by SetInteractionTarget via Requests methods
             if (_currentInteractingNPC == null) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(UpdateActionConfig)} called, but no active NPC.", ConvaiLogger.LogCategory.Character); return; }
             if (actionConfig == null) { ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(UpdateActionConfig)} called with null config for {_currentInteractingNPC.name}.", ConvaiLogger.LogCategory.Character); return; }
@@ -385,6 +390,22 @@ namespace Convai.Scripts.Runtime.Core
         }
 
         #endregion
+
+        public void UpdateNarrativeDesignKeys()
+        {
+            if(CurrentInteractingNPC == null)
+            {
+                ConvaiLogger.Warn($"[{nameof(ConvaiGRPCWebAPI)}] {nameof(UpdateNarrativeDesignKeys)} called but no active NPC.", ConvaiLogger.LogCategory.Character);
+                return;
+            }
+
+            string templateKeyJSON = GetJsonString(_currentInteractingNPC.NarrativeDesignKeyController?.narrativeDesignKeyController, "NarrativeDesign Keys");
+#if UNITY_WEBGL && !UNITY_EDITOR
+             try { updateNarrativeDesignKeys(templateKeyJSON); } catch (Exception e) { ConvaiLogger.Error($"JS call updateNarrativeDesignKeys failed: {e.Message}", ConvaiLogger.LogCategory.Character); }
+#else
+            ConvaiLogger.DebugLog($"[{nameof(ConvaiGRPCWebAPI)}] JS Interop: updateNarrativeDesignKeys('{templateKeyJSON}') called (Editor Dummy).", ConvaiLogger.LogCategory.Character);
+#endif
+        }
 
         #region Audio Control Methods
 
@@ -608,6 +629,7 @@ namespace Convai.Scripts.Runtime.Core
         [DllImport("__Internal")] private static extern void sendFeedback(string character_id, string session_id, bool thumbs_up, string feedback_text);
         [DllImport("__Internal")] private static extern void sendTriggerData(string triggerName, string triggerMessage);
         [DllImport("__Internal")] private static extern void setActionConfig(string actionConfigJson);
+        [DllImport("__Internal")] private static extern void updateNarrativeDesignKeys(string newNarrativeDesignKeys);
         [DllImport("__Internal")] private static extern void interruptCharacter();
         [DllImport("__Internal")] private static extern void toggleAudioVolume();
         [DllImport("__Internal")] private static extern void pauseAudio();

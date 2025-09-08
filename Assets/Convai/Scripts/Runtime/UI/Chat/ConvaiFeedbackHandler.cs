@@ -22,6 +22,9 @@ namespace Convai.Scripts.Runtime.UI
             _thumbsUPButton.onClick.AddListener(() => OnFeedbackButtonClicked(_thumbsUPButton));
             _thumbsDownButton.onClick.AddListener(() => OnFeedbackButtonClicked(_thumbsDownButton));
             ConvaiNPCManager.Instance.OnActiveNPCChanged += OnActiveNPCChanged;
+
+            if (ConvaiNPCManager.Instance.activeConvaiNPC != null)
+                _convaiNPC = ConvaiNPCManager.Instance.activeConvaiNPC;
         }
 
         /// <summary>
