@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Convai.Scripts.Runtime.Core;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -42,8 +43,8 @@ namespace Convai.Scripts.Runtime.Features
             NarrativeDesignKey reference = narrativeDesignKeyController.narrativeDesignKeys.Find(x => x.name == name);
             if (reference == null) return;
             reference.value = value;
+
+            ConvaiGRPCWebAPI.Instance.UpdateNarrativeDesignKeys();
         }
-        
-     
     }
 }
